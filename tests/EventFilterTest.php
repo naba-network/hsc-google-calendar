@@ -34,6 +34,15 @@ final class EventFilterTest extends TestCase
         self::assertCount(1, $result);
     }
 
+    public function testTitleOnlyIgnoresDescription(): void
+    {
+        $event = $this->event('Gebucht', 'Freie Eiszeit');
+
+        self::assertTrue(Event_Filter::from_pattern('freie')->matches($event));
+        self::assertFalse(Event_Filter::from_pattern('freie', true)->matches($event));
+        self::assertTrue(Event_Filter::from_pattern('^gebucht', true)->matches($event));
+    }
+
     public function testPatternMayContainDelimiterCharacter(): void
     {
         self::assertTrue(Event_Filter::from_pattern('a~b')->matches($this->event('a~b')));

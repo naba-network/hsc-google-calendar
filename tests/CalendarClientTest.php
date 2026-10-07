@@ -43,6 +43,20 @@ final class CalendarClientTest extends TestCase
         self::assertStringContainsString('pageToken=next-1', $this->requests[1]['url']);
     }
 
+    public function testTimeMaxIsOnlySentWhenGiven(): void
+    {
+        $client = $this->client([
+            ['status' => 200, 'body' => '{"items":[]}'],
+            ['status' => 200, 'body' => '{"items":[]}'],
+        ]);
+
+        $client->list_events(self::CALENDAR_ID, null, 'key-1', 1700000000, 1700000000);
+        $client->list_events(self::CALENDAR_ID, null, 'key-1', 1700000000, 1700000000, 1800000000);
+
+        self::assertStringNotContainsString('timeMax', $this->requests[0]['url']);
+        self::assertStringContainsString('timeMax=2027-01-15T08%3A00%3A00Z', $this->requests[1]['url']);
+    }
+
     public function testFailureThrowsGoogleMessage(): void
     {
         $client = $this->client([['status' => 404, 'body' => '{"error":{"message":"Not Found"}}']]);

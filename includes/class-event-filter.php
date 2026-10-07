@@ -23,21 +23,23 @@ final class Event_Filter {
 	/**
 	 * Creates the filter.
 	 *
-	 * @param string $regex Full PCRE pattern including delimiters, or '' to match all.
+	 * @param string $regex      Full PCRE pattern including delimiters, or '' to match all.
+	 * @param bool   $title_only Match the title only, not the description.
 	 */
-	private function __construct( private readonly string $regex ) {}
+	private function __construct( private readonly string $regex, private readonly bool $title_only ) {}
 
 	/**
 	 * Builds a filter from a user supplied pattern WITHOUT delimiters, e.g. "^Eiszeit|Training".
 	 *
-	 * @param string $pattern Pattern body.
+	 * @param string $pattern    Pattern body.
+	 * @param bool   $title_only Match the event title only, not the description.
 	 *
 	 * @throws InvalidArgumentException When the pattern is not a valid regular expression.
 	 */
-	public static function from_pattern( string $pattern ): self {
+	public static function from_pattern( string $pattern, bool $title_only = false ): self {
 		$pattern = trim( $pattern );
 		if ( '' === $pattern ) {
-			return new self( '' );
+			return new self( '', $title_only );
 		}
 
 		$regex = '~' . str_replace( '~', '\~', $pattern ) . '~iu';
@@ -46,7 +48,7 @@ final class Event_Filter {
 			throw new InvalidArgumentException( 'Invalid regular expression: ' . ( preg_last_error_msg() ) );
 		}
 
-		return new self( $regex );
+		return new self( $regex, $title_only );
 	}
 
 	/**
@@ -59,7 +61,8 @@ final class Event_Filter {
 			return true;
 		}
 
-		return 1 === preg_match( $this->regex, $event->summary ) || 1 === preg_match( $this->regex, $event->description );
+		return 1 === preg_match( $this->regex, $event->summary )
+			|| ( ! $this->title_only && 1 === preg_match( $this->regex, $event->description ) );
 	}
 
 	/**

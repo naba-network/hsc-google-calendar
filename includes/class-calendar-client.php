@@ -44,11 +44,12 @@ final class Calendar_Client {
 	 * @param string           $api_key     Google Cloud API key, may be empty when credentials are given.
 	 * @param int              $time_min    Unix timestamp of the earliest event start to include.
 	 * @param int              $now         Current unix timestamp (for the token).
+	 * @param int|null         $time_max    Unix timestamp the event start must be before, null for no upper limit.
 	 *
 	 * @return list<Event>
 	 * @throws RuntimeException When authentication or the request fails.
 	 */
-	public function list_events( string $calendar_id, ?Credentials $credentials, string $api_key, int $time_min, int $now ): array {
+	public function list_events( string $calendar_id, ?Credentials $credentials, string $api_key, int $time_min, int $now, ?int $time_max = null ): array {
 		$headers = array();
 		$query   = array(
 			'singleEvents' => 'true',
@@ -56,6 +57,9 @@ final class Calendar_Client {
 			'maxResults'   => (string) self::PAGE_SIZE,
 			'timeMin'      => gmdate( 'Y-m-d\TH:i:s\Z', $time_min ),
 		);
+		if ( null !== $time_max ) {
+			$query['timeMax'] = gmdate( 'Y-m-d\TH:i:s\Z', $time_max );
+		}
 		if ( null !== $credentials ) {
 			$headers['Authorization'] = 'Bearer ' . $this->auth->access_token( $credentials, $now );
 		} elseif ( '' !== $api_key ) {

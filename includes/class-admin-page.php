@@ -22,11 +22,22 @@ final class Admin_Page {
 
 	public const ACTION_SAVE = 'hsc_gcal_save_settings';
 	public const ACTION_TEST = 'hsc_gcal_test_connection';
+	public const ACTION_MAIL = 'hsc_gcal_test_mail';
+
+	private const FIELD_TEST_TO   = 'hsc_test_to';
+	private const TRANSIENT_MAIL  = 'hsc_gcal_mail_test_';
+	private const MAIL_RESULT_TTL = 600;
 
 	private const FIELD_CALENDAR_ID = 'hsc_calendar_id';
 	private const FIELD_CREDENTIALS = 'hsc_service_account';
 	private const FIELD_API_KEY     = 'hsc_api_key';
 	private const FIELD_REGEX       = 'hsc_event_regex';
+	private const FIELD_BOOKED      = 'hsc_booked_regex';
+	private const FIELD_RANGE_FROM  = 'hsc_range_from';
+	private const FIELD_RANGE_TO    = 'hsc_range_to';
+	private const FIELD_MAIL_FROM   = 'hsc_mail_from';
+	private const FIELD_MAIL_NAME   = 'hsc_mail_from_name';
+	private const FIELD_MAIL_TO     = 'hsc_mail_to';
 	private const QUERY_NOTICE      = 'hsc_notice';
 
 	/**
@@ -38,6 +49,7 @@ final class Admin_Page {
 	 * @param Settings          $settings Stored calendar settings.
 	 * @param Connection_Tester $tester   Calendar connection check.
 	 * @param Calendar_Client   $client   Event loader.
+	 * @param Booking_Mailer    $mailer   Booking e-mails, used for the test send.
 	 */
 	public function __construct(
 		private readonly string $basename,
@@ -45,7 +57,8 @@ final class Admin_Page {
 		private readonly Updater $updater,
 		private readonly Settings $settings,
 		private readonly Connection_Tester $tester,
-		private readonly Calendar_Client $client
+		private readonly Calendar_Client $client,
+		private readonly Booking_Mailer $mailer
 	) {}
 
 	/**
@@ -56,6 +69,7 @@ final class Admin_Page {
 		add_action( 'admin_post_' . self::ACTION, array( $this, 'handle_check_updates' ) );
 		add_action( 'admin_post_' . self::ACTION_SAVE, array( $this, 'handle_save_settings' ) );
 		add_action( 'admin_post_' . self::ACTION_TEST, array( $this, 'handle_test_connection' ) );
+		add_action( 'admin_post_' . self::ACTION_MAIL, array( $this, 'handle_test_mail' ) );
 	}
 
 	/**
@@ -97,19 +111,34 @@ final class Admin_Page {
 		// phpcs:disable WordPress.Security.NonceVerification.Missing -- Nonce checked in authorize().
 		$calendar_id = isset( $_POST[ self::FIELD_CALENDAR_ID ] ) ? sanitize_text_field( wp_unslash( (string) $_POST[ self::FIELD_CALENDAR_ID ] ) ) : '';
 		// JSON is validated by Credentials::from_json(); text sanitizing would corrupt the key.
-		$json    = isset( $_POST[ self::FIELD_CREDENTIALS ] ) ? trim( wp_unslash( (string) $_POST[ self::FIELD_CREDENTIALS ] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		$api_key = isset( $_POST[ self::FIELD_API_KEY ] ) ? sanitize_text_field( wp_unslash( (string) $_POST[ self::FIELD_API_KEY ] ) ) : '';
-		$regex   = isset( $_POST[ self::FIELD_REGEX ] ) ? trim( wp_unslash( (string) $_POST[ self::FIELD_REGEX ] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Validated by Event_Filter.
+		$json       = isset( $_POST[ self::FIELD_CREDENTIALS ] ) ? trim( wp_unslash( (string) $_POST[ self::FIELD_CREDENTIALS ] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$api_key    = isset( $_POST[ self::FIELD_API_KEY ] ) ? sanitize_text_field( wp_unslash( (string) $_POST[ self::FIELD_API_KEY ] ) ) : '';
+		$regex      = isset( $_POST[ self::FIELD_REGEX ] ) ? trim( wp_unslash( (string) $_POST[ self::FIELD_REGEX ] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Validated by Event_Filter.
+		$booked     = isset( $_POST[ self::FIELD_BOOKED ] ) ? trim( wp_unslash( (string) $_POST[ self::FIELD_BOOKED ] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Validated by Event_Filter.
+		$range_from = isset( $_POST[ self::FIELD_RANGE_FROM ] ) ? sanitize_text_field( wp_unslash( (string) $_POST[ self::FIELD_RANGE_FROM ] ) ) : '';
+		$range_to   = isset( $_POST[ self::FIELD_RANGE_TO ] ) ? sanitize_text_field( wp_unslash( (string) $_POST[ self::FIELD_RANGE_TO ] ) ) : '';
+		$from       = isset( $_POST[ self::FIELD_MAIL_FROM ] ) ? sanitize_email( wp_unslash( (string) $_POST[ self::FIELD_MAIL_FROM ] ) ) : '';
+		$name       = isset( $_POST[ self::FIELD_MAIL_NAME ] ) ? sanitize_text_field( wp_unslash( (string) $_POST[ self::FIELD_MAIL_NAME ] ) ) : '';
+		$to         = isset( $_POST[ self::FIELD_MAIL_TO ] ) ? sanitize_email( wp_unslash( (string) $_POST[ self::FIELD_MAIL_TO ] ) ) : '';
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
 		$this->settings->save_calendar_id( $calendar_id );
+		$range_error = $this->range_error( $range_from, $range_to );
+		if ( null !== $range_error ) {
+			$this->settings->save_status( Connection_Result::failure( $range_error . ' Settings were not saved.', time() ) );
+			$this->redirect_back( 'saved' );
+		}
+		$this->settings->save_range( $range_from, $range_to );
+		$this->settings->save_mail( $from, $name, $to );
 		// Empty field keeps the stored key, like the service account JSON.
 		if ( '' !== $api_key ) {
 			$this->settings->save_api_key( $api_key );
 		}
 		try {
 			Event_Filter::from_pattern( $regex );
+			Event_Filter::from_pattern( $booked );
 			$this->settings->save_event_regex( $regex );
+			$this->settings->save_booked_regex( $booked );
 		} catch ( InvalidArgumentException $e ) {
 			$this->settings->save_status( Connection_Result::failure( $e->getMessage() . ' Filter was not saved.', time() ) );
 			$this->redirect_back( 'saved' );
@@ -128,6 +157,66 @@ final class Admin_Page {
 
 		$this->run_test();
 		$this->redirect_back( 'saved' );
+	}
+
+	/**
+	 * Sends both booking e-mails with sample data to the given address and stores what was sent, so it can be shown.
+	 */
+	public function handle_test_mail(): void {
+		$this->authorize( self::ACTION_MAIL );
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce checked in authorize().
+		$to      = isset( $_POST[ self::FIELD_TEST_TO ] ) ? sanitize_email( wp_unslash( (string) $_POST[ self::FIELD_TEST_TO ] ) ) : '';
+		$key     = self::TRANSIENT_MAIL . get_current_user_id();
+		$results = array(
+			'to'    => $to,
+			'sent'  => time(),
+			'mails' => array(),
+		);
+
+		if ( ! is_email( $to ) ) {
+			$results['error'] = 'Please enter a valid e-mail address.';
+			set_transient( $key, $results, self::MAIL_RESULT_TTL );
+			$this->redirect_back( 'mailtested' );
+		}
+
+		$start  = new \DateTimeImmutable( 'next saturday 10:00', wp_timezone() );
+		$event  = new Event( 'test-event', 'Freie Eiszeit', '', $start->format( DATE_ATOM ), $start->modify( '+90 minutes' )->format( DATE_ATOM ), false );
+		$sample = new Booking_Request( $event->id, 'Max Mustermann', $to, '+43 660 0000000', 4, 2, 'Das ist eine Test-Anfrage.', '' );
+
+		// Both mails go to the test address, never to the real club inbox or a sample visitor.
+		foreach ( $this->mailer->send_test( $sample, $event, $to ) as $result ) {
+			$results['mails'][] = array(
+				'label'   => $result['label'],
+				'error'   => $result['error'],
+				'to'      => $result['mail']->to,
+				'subject' => $result['mail']->subject,
+				'headers' => $result['mail']->headers,
+				'body'    => $result['mail']->body,
+			);
+		}
+
+		set_transient( $key, $results, self::MAIL_RESULT_TTL );
+		$this->redirect_back( 'mailtested' );
+	}
+
+	/**
+	 * Why a date range cannot be saved, null when it is fine.
+	 *
+	 * @param string $from First day ("Y-m-d") or ''.
+	 * @param string $to   Last day ("Y-m-d") or ''.
+	 */
+	private function range_error( string $from, string $to ): ?string {
+		foreach ( array( $from, $to ) as $day ) {
+			if ( '' !== $day && ! Date_Range::is_valid_day( $day ) ) {
+				return 'Invalid date "' . $day . '", expected YYYY-MM-DD.';
+			}
+		}
+		if ( '' !== $from && '' !== $to && $from > $to ) {
+			return 'The first day must not be after the last day.';
+		}
+
+		return null;
 	}
 
 	/**
@@ -228,10 +317,41 @@ final class Admin_Page {
 						</td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="<?php echo esc_attr( self::FIELD_REGEX ); ?>"><?php esc_html_e( 'Event filter (regex)', 'hsc-google-calendar' ); ?></label></th>
+						<th scope="row"><label for="<?php echo esc_attr( self::FIELD_REGEX ); ?>"><?php esc_html_e( 'Free events (regex)', 'hsc-google-calendar' ); ?></label></th>
 						<td>
 							<input type="text" class="regular-text code" id="<?php echo esc_attr( self::FIELD_REGEX ); ?>" name="<?php echo esc_attr( self::FIELD_REGEX ); ?>" value="<?php echo esc_attr( $this->settings->event_regex() ); ?>" autocomplete="off" spellcheck="false">
-							<p class="description"><?php esc_html_e( 'Pattern without delimiters, case-insensitive, matched against title and description. Empty shows all events.', 'hsc-google-calendar' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Event names that are free to book, listed by [HSC-Event-Booking-List]. Pattern without delimiters, case-insensitive, matched against the title. Empty lists all events.', 'hsc-google-calendar' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="<?php echo esc_attr( self::FIELD_BOOKED ); ?>"><?php esc_html_e( 'Booked events (regex)', 'hsc-google-calendar' ); ?></label></th>
+						<td>
+							<input type="text" class="regular-text code" id="<?php echo esc_attr( self::FIELD_BOOKED ); ?>" name="<?php echo esc_attr( self::FIELD_BOOKED ); ?>" value="<?php echo esc_attr( $this->settings->booked_regex() ); ?>" autocomplete="off" spellcheck="false">
+							<p class="description"><?php esc_html_e( 'Event names that count as valid bookings, shown by [HSC-Event-Booking-Summary]. Matched against the title. Name, Teilnehmer, Leihausrüstung, E-Mail, Telefon and Anmerkung are read from "Key: value" lines in the event description. Empty shows nothing.', 'hsc-google-calendar' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="<?php echo esc_attr( self::FIELD_RANGE_FROM ); ?>"><?php esc_html_e( 'Date range', 'hsc-google-calendar' ); ?></label></th>
+						<td>
+							<input type="date" id="<?php echo esc_attr( self::FIELD_RANGE_FROM ); ?>" name="<?php echo esc_attr( self::FIELD_RANGE_FROM ); ?>" value="<?php echo esc_attr( $this->settings->range_from() ); ?>">
+							<?php esc_html_e( 'to', 'hsc-google-calendar' ); ?>
+							<input type="date" id="<?php echo esc_attr( self::FIELD_RANGE_TO ); ?>" name="<?php echo esc_attr( self::FIELD_RANGE_TO ); ?>" value="<?php echo esc_attr( $this->settings->range_to() ); ?>" aria-label="<?php esc_attr_e( 'Last day', 'hsc-google-calendar' ); ?>">
+							<p class="description"><?php esc_html_e( 'Both shortcodes only look at events in this range, last day included. Empty start means the beginning of the current month, empty end means no limit. Events that already started are never offered for booking.', 'hsc-google-calendar' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="<?php echo esc_attr( self::FIELD_MAIL_FROM ); ?>"><?php esc_html_e( 'E-mail sender address', 'hsc-google-calendar' ); ?></label></th>
+						<td><input type="email" class="regular-text" id="<?php echo esc_attr( self::FIELD_MAIL_FROM ); ?>" name="<?php echo esc_attr( self::FIELD_MAIL_FROM ); ?>" value="<?php echo esc_attr( $this->settings->mail_from() ); ?>" autocomplete="off"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="<?php echo esc_attr( self::FIELD_MAIL_NAME ); ?>"><?php esc_html_e( 'E-mail sender name', 'hsc-google-calendar' ); ?></label></th>
+						<td><input type="text" class="regular-text" id="<?php echo esc_attr( self::FIELD_MAIL_NAME ); ?>" name="<?php echo esc_attr( self::FIELD_MAIL_NAME ); ?>" value="<?php echo esc_attr( $this->settings->mail_from_name() ); ?>" autocomplete="off"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="<?php echo esc_attr( self::FIELD_MAIL_TO ); ?>"><?php esc_html_e( 'Notification recipient', 'hsc-google-calendar' ); ?></label></th>
+						<td>
+							<input type="email" class="regular-text" id="<?php echo esc_attr( self::FIELD_MAIL_TO ); ?>" name="<?php echo esc_attr( self::FIELD_MAIL_TO ); ?>" value="<?php echo esc_attr( $this->settings->mail_to() ); ?>" autocomplete="off">
+							<p class="description"><?php esc_html_e( 'Receives every booking request. Defaults to the sender address.', 'hsc-google-calendar' ); ?></p>
 						</td>
 					</tr>
 				</table>
@@ -242,6 +362,67 @@ final class Admin_Page {
 				<?php wp_nonce_field( self::ACTION_TEST ); ?>
 				<?php submit_button( __( 'Test connection again', 'hsc-google-calendar' ), 'secondary', 'submit', false ); ?>
 			</form>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Renders the e-mail test: send form and the content of the last test send.
+	 */
+	private function render_mail_test_card(): void {
+		$last = get_transient( self::TRANSIENT_MAIL . get_current_user_id() );
+		$last = is_array( $last ) ? $last : null;
+		$user = wp_get_current_user();
+		$to   = null !== $last && is_string( $last['to'] ?? null ) && '' !== $last['to'] ? $last['to'] : $user->user_email;
+		?>
+		<div class="card">
+			<h2><?php esc_html_e( 'Test e-mails', 'hsc-google-calendar' ); ?></h2>
+			<p>
+				<?php
+				printf(
+					/* translators: 1: sender name, 2: sender address, 3: notification recipient */
+					esc_html__( 'Sender: %1$s <%2$s>. Booking requests are announced to: %3$s.', 'hsc-google-calendar' ),
+					esc_html( $this->settings->mail_from_name() ),
+					esc_html( $this->settings->mail_from() ),
+					esc_html( $this->settings->mail_to() )
+				);
+				?>
+			</p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION_MAIL ); ?>">
+				<?php wp_nonce_field( self::ACTION_MAIL ); ?>
+				<p>
+					<label for="<?php echo esc_attr( self::FIELD_TEST_TO ); ?>"><?php esc_html_e( 'Send both booking e-mails with sample data to', 'hsc-google-calendar' ); ?></label><br>
+					<input type="email" class="regular-text" id="<?php echo esc_attr( self::FIELD_TEST_TO ); ?>" name="<?php echo esc_attr( self::FIELD_TEST_TO ); ?>" value="<?php echo esc_attr( $to ); ?>" required>
+				</p>
+				<p class="description"><?php esc_html_e( 'Nothing goes to the club inbox or to the sample visitor, both mails are sent to this address only and marked [TEST].', 'hsc-google-calendar' ); ?></p>
+				<?php submit_button( __( 'Send test e-mails', 'hsc-google-calendar' ), 'secondary', 'submit', false ); ?>
+			</form>
+			<?php if ( null !== $last ) : ?>
+				<h3>
+					<?php
+					/* translators: %s: date and time of the last test send */
+					printf( esc_html__( 'Last test send: %s', 'hsc-google-calendar' ), esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) ( $last['sent'] ?? 0 ) ) ) );
+					?>
+				</h3>
+				<?php if ( is_string( $last['error'] ?? null ) ) : ?>
+					<div class="notice notice-error inline"><p><?php echo esc_html( $last['error'] ); ?></p></div>
+				<?php endif; ?>
+				<?php foreach ( is_array( $last['mails'] ?? null ) ? $last['mails'] : array() as $mail ) : ?>
+					<?php $error = is_string( $mail['error'] ?? null ) ? $mail['error'] : null; ?>
+					<h4><?php echo esc_html( (string) ( $mail['label'] ?? '' ) ); ?></h4>
+					<?php if ( null === $error ) : ?>
+						<div class="notice notice-success inline"><p><?php esc_html_e( 'Handed over to the mail system. That does not guarantee delivery: check the inbox and the spam folder.', 'hsc-google-calendar' ); ?></p></div>
+					<?php else : ?>
+						<div class="notice notice-error inline"><p><strong><?php esc_html_e( 'Sending failed.', 'hsc-google-calendar' ); ?></strong> <?php echo esc_html( $error ); ?></p></div>
+					<?php endif; ?>
+					<p>
+						<strong><?php esc_html_e( 'To:', 'hsc-google-calendar' ); ?></strong> <?php echo esc_html( (string) ( $mail['to'] ?? '' ) ); ?><br>
+						<strong><?php esc_html_e( 'Subject:', 'hsc-google-calendar' ); ?></strong> <?php echo esc_html( (string) ( $mail['subject'] ?? '' ) ); ?>
+					</p>
+					<pre style="white-space:pre-wrap;background:#f6f7f7;padding:12px;border:1px solid #dcdcde"><?php echo esc_html( implode( "\n", is_array( $mail['headers'] ?? null ) ? $mail['headers'] : array() ) . "\n\n" . (string) ( $mail['body'] ?? '' ) ); ?></pre>
+				<?php endforeach; ?>
+			<?php endif; ?>
 		</div>
 		<?php
 	}
@@ -362,6 +543,7 @@ final class Admin_Page {
 				</p></div>
 			<?php endif; ?>
 			<?php $this->render_connection_card(); ?>
+			<?php $this->render_mail_test_card(); ?>
 			<?php $this->render_events_card(); ?>
 			<div class="card">
 				<h2><?php esc_html_e( 'Plugin', 'hsc-google-calendar' ); ?></h2>

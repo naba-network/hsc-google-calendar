@@ -2,6 +2,7 @@
 <ruleset name="HSC Google Calendar">
 	<file>hsc-google-calendar.php</file>
 	<file>includes</file>
+	<file>templates</file>
 	<arg name="extensions" value="php"/>
 	<arg value="ps"/>
 	<config name="testVersion" value="8.0-"/>
