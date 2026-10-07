@@ -48,7 +48,7 @@ final class Admin_Page {
 	 * @param Updater           $updater  Updater used for the manual check.
 	 * @param Settings          $settings Stored calendar settings.
 	 * @param Connection_Tester $tester   Calendar connection check.
-	 * @param Calendar_Client   $client   Event loader.
+	 * @param Event_Source      $events   Cached event loader.
 	 * @param Booking_Mailer    $mailer   Booking e-mails, used for the test send.
 	 */
 	public function __construct(
@@ -57,7 +57,7 @@ final class Admin_Page {
 		private readonly Updater $updater,
 		private readonly Settings $settings,
 		private readonly Connection_Tester $tester,
-		private readonly Calendar_Client $client,
+		private readonly Event_Source $events,
 		private readonly Booking_Mailer $mailer
 	) {}
 
@@ -123,6 +123,7 @@ final class Admin_Page {
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
 		$this->settings->save_calendar_id( $calendar_id );
+		$this->events->flush();
 		$range_error = $this->range_error( $range_from, $range_to );
 		if ( null !== $range_error ) {
 			$this->settings->save_status( Connection_Result::failure( $range_error . ' Settings were not saved.', time() ) );
@@ -244,6 +245,7 @@ final class Admin_Page {
 	 * Tests the stored settings and stores the result.
 	 */
 	private function run_test(): void {
+		$this->events->flush();
 		$this->settings->save_status(
 			$this->tester->test( $this->settings->calendar_id(), $this->settings->credentials_json(), time() )
 		);
@@ -428,73 +430,81 @@ final class Admin_Page {
 	}
 
 	/**
-	 * Renders the filtered upcoming events as a list.
+	 * Renders how many events each pattern matches. Single events are not listed.
 	 */
 	private function render_events_card(): void {
-		$result = $this->load_events();
+		$counts = $this->load_counts();
+		$rows   = array(
+			array( __( 'Free events (regex)', 'hsc-google-calendar' ), $this->settings->event_regex(), 'free' ),
+			array( __( 'Booked events (regex)', 'hsc-google-calendar' ), $this->settings->booked_regex(), 'booked' ),
+		);
 		?>
 		<div class="card">
 			<h2><?php esc_html_e( 'Events', 'hsc-google-calendar' ); ?></h2>
-			<?php if ( is_string( $result ) ) : ?>
-				<p class="description"><?php echo esc_html( $result ); ?></p>
-			<?php elseif ( array() === $result ) : ?>
-				<p><?php esc_html_e( 'No upcoming events match the filter.', 'hsc-google-calendar' ); ?></p>
+			<?php if ( is_string( $counts ) ) : ?>
+				<p class="description"><?php echo esc_html( $counts ); ?></p>
 			<?php else : ?>
-				<ul>
-					<?php foreach ( $result as $event ) : ?>
-						<li>
-							<strong><?php echo esc_html( '' !== $event->summary ? $event->summary : __( '(no title)', 'hsc-google-calendar' ) ); ?></strong>
-							<br><span class="description"><?php echo esc_html( $this->format_range( $event ) ); ?></span>
-						</li>
-					<?php endforeach; ?>
-				</ul>
+				<table class="widefat striped">
+					<thead>
+						<tr>
+							<th scope="col"><?php esc_html_e( 'Filter', 'hsc-google-calendar' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Pattern', 'hsc-google-calendar' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Events', 'hsc-google-calendar' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $rows as $row ) : ?>
+							<tr>
+								<td><?php echo esc_html( $row[0] ); ?></td>
+								<td><?php echo '' === $row[1] ? '<em>' . esc_html__( '(empty)', 'hsc-google-calendar' ) . '</em>' : '<code>' . esc_html( $row[1] ) . '</code>'; ?></td>
+								<td><strong><?php echo esc_html( (string) $counts[ $row[2] ] ); ?></strong></td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+				<p class="description"><?php esc_html_e( 'Upcoming free events and booked events in the date range. The calendar is read at most every 30 minutes; saving the settings reloads it.', 'hsc-google-calendar' ); ?></p>
 			<?php endif; ?>
 		</div>
 		<?php
 	}
 
 	/**
-	 * Loads and filters events.
-	 *
-	 * @return list<Event>|string Events, or a message why none could be shown.
+	 * Renders the shortcodes that can be pasted into pages.
 	 */
-	private function load_events(): string|array {
-		$calendar_id = $this->settings->calendar_id();
-		$json        = $this->settings->credentials_json();
-		$api_key     = $this->settings->api_key();
-		if ( '' === $calendar_id || ( '' === $json && '' === $api_key ) ) {
-			return __( 'Configure the calendar ID and a service account or API key first.', 'hsc-google-calendar' );
-		}
-
-		try {
-			$filter = Event_Filter::from_pattern( $this->settings->event_regex() );
-			$now    = time();
-
-			return $filter->apply(
-				$this->client->list_events( $calendar_id, '' === $json ? null : Credentials::from_json( $json ), $api_key, $now, $now )
-			);
-		} catch ( InvalidArgumentException | RuntimeException $e ) {
-			return $e->getMessage();
-		}
+	private function render_shortcodes_card(): void {
+		$codes = array(
+			Shortcodes::TAG_LIST    => __( 'Upcoming free events grouped by month, each with a "Jetzt buchen" button that opens the booking dialog.', 'hsc-google-calendar' ),
+			Shortcodes::TAG_SUMMARY => __( 'Booked events: totals per month and one card per booking, the next booking highlighted. Protect the page with a WordPress page password, it shows names and contact data.', 'hsc-google-calendar' ),
+		);
+		?>
+		<div class="card">
+			<h2><?php esc_html_e( 'Shortcodes', 'hsc-google-calendar' ); ?></h2>
+			<p class="description"><?php esc_html_e( 'Paste one into a page or post, in a Shortcode block or the text editor.', 'hsc-google-calendar' ); ?></p>
+			<table class="widefat striped">
+				<tbody>
+					<?php foreach ( $codes as $tag => $description ) : ?>
+						<tr>
+							<td><code>[<?php echo esc_html( $tag ); ?>]</code></td>
+							<td><?php echo esc_html( $description ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		</div>
+		<?php
 	}
 
 	/**
-	 * Human readable start/end of an event.
+	 * Counts events per pattern.
 	 *
-	 * @param Event $event Event.
+	 * @return array{free: int, booked: int}|string Counts, or a message why none could be shown.
 	 */
-	private function format_range( Event $event ): string {
-		$start = strtotime( $event->start );
-		$end   = strtotime( $event->end );
-		if ( false === $start ) {
-			return $event->start;
+	private function load_counts(): string|array {
+		try {
+			return $this->events->counts( time() );
+		} catch ( InvalidArgumentException | RuntimeException $e ) {
+			return $e->getMessage();
 		}
-		if ( $event->all_day ) {
-			return wp_date( get_option( 'date_format' ), $start );
-		}
-		$format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
-
-		return wp_date( $format, $start ) . ( false !== $end ? ' – ' . wp_date( get_option( 'time_format' ), $end ) : '' );
 	}
 
 	/**
@@ -542,9 +552,20 @@ final class Admin_Page {
 					?>
 				</p></div>
 			<?php endif; ?>
+			<style>
+				.hsc-admin { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 0 20px; align-items: start; }
+				.hsc-admin .card { max-width: none; box-sizing: border-box; width: 100%; }
+				.hsc-admin__col { min-width: 0; }
+				@media (max-width: 1100px) { .hsc-admin { grid-template-columns: minmax(0, 1fr); } }
+			</style>
+			<div class="hsc-admin">
+			<div class="hsc-admin__col">
 			<?php $this->render_connection_card(); ?>
-			<?php $this->render_mail_test_card(); ?>
+			</div>
+			<div class="hsc-admin__col">
+			<?php $this->render_shortcodes_card(); ?>
 			<?php $this->render_events_card(); ?>
+			<?php $this->render_mail_test_card(); ?>
 			<div class="card">
 				<h2><?php esc_html_e( 'Plugin', 'hsc-google-calendar' ); ?></h2>
 				<p>
@@ -583,6 +604,8 @@ final class Admin_Page {
 					<?php wp_nonce_field( self::ACTION ); ?>
 					<?php submit_button( __( 'Check for updates', 'hsc-google-calendar' ), 'secondary', 'submit', false ); ?>
 				</form>
+			</div>
+			</div>
 			</div>
 		</div>
 		<?php

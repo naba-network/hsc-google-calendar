@@ -20,6 +20,7 @@ bin/build-zip.sh  # -> dist/hsc-google-calendar.zip
 
 Both shortcodes only look at events inside the **Date range** from the settings (inclusive, empty start = beginning of the current month, empty end = no limit).
 Google Calendar is the single source of truth, the plugin never changes events and stores no bookings.
+Calendar reads are cached for 30 minutes (shortcodes and admin page share the cache); saving the settings in the admin page reloads it, so a renamed event can take up to 30 minutes to show up on the website.
 A booking request only sends two e-mails (notification to the club, confirmation to the visitor). The club then books
 manually by renaming the event so it no longer matches the event filter (and matches the booked regex) and writes the
 details into the event description, one `Key: value` line each: `Name`, `E-Mail`, `Telefon`, `Datum`, `Personen`,

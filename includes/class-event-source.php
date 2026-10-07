@@ -17,12 +17,13 @@ use RuntimeException;
 
 /**
  * Google Calendar is the single source of truth: events are only read, never changed.
- * The raw event list is cached briefly so page views do not hit the API every time.
+ * The raw event list is cached for 30 minutes so page views do not hit the API every time; saving the settings flushes it.
  */
 final class Event_Source {
 
-	private const CACHE_KEY     = 'hsc_gcal_events_';
-	private const CACHE_SECONDS = 120;
+	private const CACHE_KEY        = 'hsc_gcal_events_';
+	private const CACHE_GENERATION = 'hsc_gcal_cache_generation';
+	private const CACHE_SECONDS    = 1800;
 
 	/**
 	 * Creates the source.
@@ -34,6 +35,28 @@ final class Event_Source {
 		private readonly Settings $settings,
 		private readonly Calendar_Client $client
 	) {}
+
+	/**
+	 * Forgets the cached event lists, the next read asks the API again.
+	 */
+	public function flush(): void {
+		update_option( self::CACHE_GENERATION, (string) microtime( true ), false );
+	}
+
+	/**
+	 * Number of upcoming free events and of booked events, for the admin page.
+	 *
+	 * @param int $now Current unix timestamp.
+	 *
+	 * @return array{free: int, booked: int}
+	 * @throws RuntimeException When the calendar is not configured or cannot be read.
+	 */
+	public function counts( int $now ): array {
+		return array(
+			'free'   => count( $this->free_events( $now ) ),
+			'booked' => count( $this->bookings( $now ) ),
+		);
+	}
 
 	/**
 	 * Upcoming events that are still free to book (match the free pattern, are not booked and have not started).
@@ -127,7 +150,7 @@ final class Event_Source {
 		}
 
 		$range  = new Date_Range( $this->settings->range_from(), $this->settings->range_to(), wp_timezone() );
-		$key    = self::CACHE_KEY . md5( HSC_GCAL_VERSION . $calendar_id . $range->key() );
+		$key    = self::CACHE_KEY . md5( HSC_GCAL_VERSION . get_option( self::CACHE_GENERATION, '' ) . $calendar_id . $range->key() );
 		$cached = get_transient( $key );
 		if ( is_array( $cached ) ) {
 			return array_values( array_filter( $cached, static fn( mixed $item ): bool => $item instanceof Event ) );

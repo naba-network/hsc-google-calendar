@@ -60,6 +60,8 @@ $hsc_gcal_client   = new \Hsc\GoogleCalendar\Calendar_Client(
 	\Hsc\GoogleCalendar\Connection_Tester::with_wordpress_http()
 );
 
+$hsc_gcal_events = new \Hsc\GoogleCalendar\Event_Source( $hsc_gcal_settings, $hsc_gcal_client );
+
 $hsc_gcal_mailer = \Hsc\GoogleCalendar\Booking_Mailer::with_wordpress_mail(
 	$hsc_gcal_settings->mail_from(),
 	$hsc_gcal_settings->mail_from_name(),
@@ -72,11 +74,9 @@ $hsc_gcal_mailer = \Hsc\GoogleCalendar\Booking_Mailer::with_wordpress_mail(
 	$hsc_gcal_updater,
 	$hsc_gcal_settings,
 	\Hsc\GoogleCalendar\Connection_Tester::with_wordpress_http(),
-	$hsc_gcal_client,
+	$hsc_gcal_events,
 	$hsc_gcal_mailer
 ) )->register();
-
-$hsc_gcal_events = new \Hsc\GoogleCalendar\Event_Source( $hsc_gcal_settings, $hsc_gcal_client );
 
 ( new \Hsc\GoogleCalendar\Shortcodes( $hsc_gcal_events, plugin_dir_url( HSC_GCAL_FILE ), HSC_GCAL_VERSION ) )->register();
 
