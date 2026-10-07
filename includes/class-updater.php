@@ -16,6 +16,7 @@ final class Updater {
 
 	public const ASSET_NAME = 'hsc-google-calendar.zip';
 	private const CACHE_KEY = 'hsc_gcal_latest_release';
+	private const ERROR_KEY = 'hsc_gcal_update_error';
 	private const CACHE_TTL = 6 * HOUR_IN_SECONDS;
 
 	/**
@@ -133,6 +134,27 @@ final class Updater {
 	}
 
 	/**
+	 * Clears all caches and asks WordPress to re-check plugin updates right now.
+	 *
+	 * @return string|null Error message, or null when the check succeeded.
+	 */
+	public function force_check(): ?string {
+		delete_site_transient( self::CACHE_KEY );
+		delete_site_transient( 'update_plugins' );
+		wp_update_plugins();
+
+		return $this->last_error();
+	}
+
+	/**
+	 * Error of the last GitHub request, if it failed.
+	 */
+	public function last_error(): ?string {
+		$error = get_site_transient( self::ERROR_KEY );
+		return is_string( $error ) && '' !== $error ? $error : null;
+	}
+
+	/**
 	 * Fetches (and caches) the latest release from GitHub.
 	 *
 	 * @return array<string, mixed>|null
@@ -150,16 +172,39 @@ final class Updater {
 				'headers' => array( 'Accept' => 'application/vnd.github+json' ),
 			)
 		);
-		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-			return null;
+		if ( is_wp_error( $response ) ) {
+			return $this->fail( $response->get_error_message() );
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $code ) {
+			return $this->fail(
+				404 === $code
+					? 'GitHub HTTP 404: no release found or the repository is private (it must be public).'
+					: sprintf( 'GitHub HTTP %d', $code )
+			);
 		}
 
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( ! is_array( $data ) ) {
-			return null;
+			return $this->fail( 'Invalid response from GitHub.' );
+		}
+		if ( null === self::parse_release( $data ) ) {
+			return $this->fail( sprintf( 'Latest release has no valid version tag or no "%s" asset.', self::ASSET_NAME ) );
 		}
 
+		delete_site_transient( self::ERROR_KEY );
 		set_site_transient( self::CACHE_KEY, $data, self::CACHE_TTL );
 		return $data;
+	}
+
+	/**
+	 * Remembers an error for display in the admin page.
+	 *
+	 * @param string $message Error message.
+	 */
+	private function fail( string $message ): ?array {
+		set_site_transient( self::ERROR_KEY, $message, DAY_IN_SECONDS );
+		return null;
 	}
 }
