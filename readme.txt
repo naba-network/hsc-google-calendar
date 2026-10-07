@@ -3,7 +3,7 @@ Contributors: hschohenems
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.1.4
+Stable tag: 0.1.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,11 @@ The plugin updates itself from GitHub releases.
 3. Later versions appear as regular updates in the WordPress admin.
 
 == Changelog ==
+
+= 0.1.5 =
+* fix
+* fix
+* added updater
 
 = 0.1.4 =
 * fix
