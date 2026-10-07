@@ -19,5 +19,5 @@ bin/build-zip.sh  # -> dist/hsc-google-calendar.zip
   since the last tag (`feat` → minor, `fix`/other → patch, `!`/`BREAKING CHANGE` → major),
   updates plugin header, `readme.txt` and `CHANGELOG.md`, commits to `production`,
   tags `vX.Y.Z` and publishes a GitHub release with `hsc-google-calendar.zip`.
-- Installed sites check the latest GitHub release and show the update in WP admin.
+- Installed sites check the latest GitHub release via [plugin-update-checker](https://github.com/YahnisElsts/plugin-update-checker) (same as hd-plugin-wordpress) and show the update in WP admin; the HSC Calendar page has a "Check for updates" button. The zip ships production `vendor/`.
   The repository must be public.

@@ -23,13 +23,16 @@ define( 'HSC_GCAL_VERSION', '0.1.4' );
 define( 'HSC_GCAL_FILE', __FILE__ );
 define( 'HSC_GCAL_GITHUB_REPO', 'naba-network/hsc-google-calendar' );
 
+if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
+	require_once __DIR__ . '/vendor/autoload.php';
+}
 require_once __DIR__ . '/includes/class-updater.php';
 require_once __DIR__ . '/includes/class-admin-page.php';
 
 $hsc_gcal_updater = new \Hsc\GoogleCalendar\Updater(
-	plugin_basename( HSC_GCAL_FILE ),
-	HSC_GCAL_VERSION,
-	HSC_GCAL_GITHUB_REPO
+	HSC_GCAL_FILE,
+	HSC_GCAL_GITHUB_REPO,
+	'hsc-google-calendar'
 );
 $hsc_gcal_updater->register();
 
