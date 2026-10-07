@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       HSC Google Calendar
  * Description:       Shows free ice time slots from Google Calendar and makes them bookable on the club website.
- * Version:           0.1.0
+ * Version:           0.1.1
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            HSC Hohenems
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HSC_GCAL_VERSION', '0.1.0' );
+define( 'HSC_GCAL_VERSION', '0.1.1' );
 define( 'HSC_GCAL_FILE', __FILE__ );
 define( 'HSC_GCAL_GITHUB_REPO', 'naba-network/hsc-google-calendar' );
 
