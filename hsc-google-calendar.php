@@ -27,6 +27,13 @@ if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
 	require_once __DIR__ . '/vendor/autoload.php';
 }
 require_once __DIR__ . '/includes/class-updater.php';
+require_once __DIR__ . '/includes/class-credentials.php';
+require_once __DIR__ . '/includes/class-connection-result.php';
+require_once __DIR__ . '/includes/class-connection-tester.php';
+require_once __DIR__ . '/includes/class-event.php';
+require_once __DIR__ . '/includes/class-event-filter.php';
+require_once __DIR__ . '/includes/class-calendar-client.php';
+require_once __DIR__ . '/includes/class-settings.php';
 require_once __DIR__ . '/includes/class-admin-page.php';
 
 $hsc_gcal_updater = new \Hsc\GoogleCalendar\Updater(
@@ -36,4 +43,14 @@ $hsc_gcal_updater = new \Hsc\GoogleCalendar\Updater(
 );
 $hsc_gcal_updater->register();
 
-( new \Hsc\GoogleCalendar\Admin_Page( plugin_basename( HSC_GCAL_FILE ), HSC_GCAL_VERSION, $hsc_gcal_updater ) )->register();
+( new \Hsc\GoogleCalendar\Admin_Page(
+	plugin_basename( HSC_GCAL_FILE ),
+	HSC_GCAL_VERSION,
+	$hsc_gcal_updater,
+	new \Hsc\GoogleCalendar\Settings(),
+	\Hsc\GoogleCalendar\Connection_Tester::with_wordpress_http(),
+	new \Hsc\GoogleCalendar\Calendar_Client(
+		\Hsc\GoogleCalendar\Connection_Tester::wordpress_sender(),
+		\Hsc\GoogleCalendar\Connection_Tester::with_wordpress_http()
+	)
+) )->register();
