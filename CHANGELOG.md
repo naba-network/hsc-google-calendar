@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 Versions are generated automatically on push to `production`.
 
+## [0.1.7] - 2026-10-08
+
+### Fixed
+
+- fix update
+
 ## [0.1.6] - 2026-10-07
 
 ### Fixed
