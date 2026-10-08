@@ -41,10 +41,30 @@ final class Updater {
 	) {}
 
 	/**
+	 * Whether updates are switched off for this environment.
+	 *
+	 * In local development the plugin folder is a bind mount of the git repo. A plugin update deletes
+	 * that folder first, which would wipe the working copy including .git. Define
+	 * HSC_DISABLE_UPDATER as true to opt out anywhere else.
+	 */
+	public static function is_disabled(): bool {
+		if ( defined( 'HSC_DISABLE_UPDATER' ) && true === constant( 'HSC_DISABLE_UPDATER' ) ) {
+			return true;
+		}
+
+		return in_array( wp_get_environment_type(), array( 'local', 'development' ), true );
+	}
+
+	/**
 	 * Hook into WordPress.
 	 */
 	public function register(): void {
+		if ( self::is_disabled() ) {
+			return;
+		}
+
 		if ( ! class_exists( PucFactory::class ) ) {
+			add_action( 'admin_notices', array( $this, 'render_missing_vendor_notice' ) );
 			return;
 		}
 
@@ -68,13 +88,34 @@ final class Updater {
 	}
 
 	/**
+	 * Warns admins that updates cannot work because vendor/ is missing.
+	 *
+	 * This happens when the plugin was installed from the repository source instead of the release zip.
+	 */
+	public function render_missing_vendor_notice(): void {
+		if ( ! current_user_can( 'update_plugins' ) ) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-warning"><p>%s</p></div>',
+			esc_html(
+				sprintf(
+					'Das Plugin „%s“ kann keine Updates erhalten, weil der Ordner vendor/ fehlt. Installiere das Plugin einmalig aus dem ZIP des neuesten GitHub-Releases.',
+					$this->slug
+				)
+			)
+		);
+	}
+
+	/**
 	 * Checks GitHub for a new release right now, bypassing the update cache.
 	 *
 	 * @return string|null Error message, or null when the check succeeded.
 	 */
 	public function force_check(): ?string {
 		if ( null === $this->checker ) {
-			return $this->remember_error( 'plugin-update-checker is not installed (run composer install).' );
+			return $this->remember_error( 'Updater is not active (plugin-update-checker is not installed, or updates are disabled in this environment).' );
 		}
 
 		$this->checker->checkForUpdates();
