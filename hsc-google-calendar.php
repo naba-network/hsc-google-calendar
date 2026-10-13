@@ -65,7 +65,12 @@ $hsc_gcal_events = new \Hsc\GoogleCalendar\Event_Source( $hsc_gcal_settings, $hs
 $hsc_gcal_mailer = \Hsc\GoogleCalendar\Booking_Mailer::with_wordpress_mail(
 	$hsc_gcal_settings->mail_from(),
 	$hsc_gcal_settings->mail_from_name(),
-	$hsc_gcal_settings->mail_to()
+	$hsc_gcal_settings->mail_to(),
+	$hsc_gcal_settings->mail_cc(),
+	array(
+		'telefon_eismeister' => $hsc_gcal_settings->phone_ice_master(),
+		'telefon_verleih'    => $hsc_gcal_settings->phone_rental(),
+	)
 );
 
 ( new \Hsc\GoogleCalendar\Admin_Page(

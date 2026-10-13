@@ -38,6 +38,9 @@ final class Admin_Page {
 	private const FIELD_MAIL_FROM   = 'hsc_mail_from';
 	private const FIELD_MAIL_NAME   = 'hsc_mail_from_name';
 	private const FIELD_MAIL_TO     = 'hsc_mail_to';
+	private const FIELD_MAIL_CC     = 'hsc_mail_cc';
+	private const FIELD_PHONE_ICE   = 'hsc_phone_ice_master';
+	private const FIELD_PHONE_RENT  = 'hsc_phone_rental';
 	private const QUERY_NOTICE      = 'hsc_notice';
 
 	/**
@@ -120,6 +123,9 @@ final class Admin_Page {
 		$from       = isset( $_POST[ self::FIELD_MAIL_FROM ] ) ? sanitize_email( wp_unslash( (string) $_POST[ self::FIELD_MAIL_FROM ] ) ) : '';
 		$name       = isset( $_POST[ self::FIELD_MAIL_NAME ] ) ? sanitize_text_field( wp_unslash( (string) $_POST[ self::FIELD_MAIL_NAME ] ) ) : '';
 		$to         = isset( $_POST[ self::FIELD_MAIL_TO ] ) ? sanitize_email( wp_unslash( (string) $_POST[ self::FIELD_MAIL_TO ] ) ) : '';
+		$cc         = isset( $_POST[ self::FIELD_MAIL_CC ] ) ? sanitize_email( wp_unslash( (string) $_POST[ self::FIELD_MAIL_CC ] ) ) : '';
+		$phone_ice  = isset( $_POST[ self::FIELD_PHONE_ICE ] ) ? sanitize_text_field( wp_unslash( (string) $_POST[ self::FIELD_PHONE_ICE ] ) ) : '';
+		$phone_rent = isset( $_POST[ self::FIELD_PHONE_RENT ] ) ? sanitize_text_field( wp_unslash( (string) $_POST[ self::FIELD_PHONE_RENT ] ) ) : '';
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
 		$this->settings->save_calendar_id( $calendar_id );
@@ -130,7 +136,8 @@ final class Admin_Page {
 			$this->redirect_back( 'saved' );
 		}
 		$this->settings->save_range( $range_from, $range_to );
-		$this->settings->save_mail( $from, $name, $to );
+		$this->settings->save_mail( $from, $name, $to, $cc );
+		$this->settings->save_phones( $phone_ice, $phone_rent );
 		// Empty field keeps the stored key, like the service account JSON.
 		if ( '' !== $api_key ) {
 			$this->settings->save_api_key( $api_key );
@@ -354,6 +361,24 @@ final class Admin_Page {
 						<td>
 							<input type="email" class="regular-text" id="<?php echo esc_attr( self::FIELD_MAIL_TO ); ?>" name="<?php echo esc_attr( self::FIELD_MAIL_TO ); ?>" value="<?php echo esc_attr( $this->settings->mail_to() ); ?>" autocomplete="off">
 							<p class="description"><?php esc_html_e( 'Receives every booking request. Defaults to the sender address.', 'hsc-google-calendar' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="<?php echo esc_attr( self::FIELD_MAIL_CC ); ?>"><?php esc_html_e( 'Notification CC', 'hsc-google-calendar' ); ?></label></th>
+						<td>
+							<input type="email" class="regular-text" id="<?php echo esc_attr( self::FIELD_MAIL_CC ); ?>" name="<?php echo esc_attr( self::FIELD_MAIL_CC ); ?>" value="<?php echo esc_attr( $this->settings->mail_cc() ); ?>" autocomplete="off">
+							<p class="description"><?php esc_html_e( 'Optional. Added as CC to the confirmation draft (.eml) and the mailto link, not to the club notification.', 'hsc-google-calendar' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="<?php echo esc_attr( self::FIELD_PHONE_ICE ); ?>"><?php esc_html_e( 'Phone: ice master', 'hsc-google-calendar' ); ?></label></th>
+						<td><input type="tel" class="regular-text" id="<?php echo esc_attr( self::FIELD_PHONE_ICE ); ?>" name="<?php echo esc_attr( self::FIELD_PHONE_ICE ); ?>" value="<?php echo esc_attr( $this->settings->phone_ice_master() ); ?>" autocomplete="off"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="<?php echo esc_attr( self::FIELD_PHONE_RENT ); ?>"><?php esc_html_e( 'Phone: equipment rental', 'hsc-google-calendar' ); ?></label></th>
+						<td>
+							<input type="tel" class="regular-text" id="<?php echo esc_attr( self::FIELD_PHONE_RENT ); ?>" name="<?php echo esc_attr( self::FIELD_PHONE_RENT ); ?>" value="<?php echo esc_attr( $this->settings->phone_rental() ); ?>" autocomplete="off">
+							<p class="description"><?php esc_html_e( 'Emergency contacts in the confirmation draft attached to the notification.', 'hsc-google-calendar' ); ?></p>
 						</td>
 					</tr>
 				</table>

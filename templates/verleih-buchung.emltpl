@@ -1,6 +1,6 @@
-X-Unsent: 1
-From: SC Samina Hohenems - Verleih <{{absender_email}}>
-To: {{email}}
+From: "{{name}}" <{{email}}>
+To: {{club_email}}
+Cc: {{cc}}
 Subject: Verleih Bestätigung - {{datum}}, {{uhrzeit}}
 MIME-Version: 1.0
 Content-Type: text/html; charset=UTF-8
@@ -71,8 +71,8 @@ Content-Transfer-Encoding: 8bit
 <h3 style="margin:0 0 8px;font-size:18px;line-height:24px;font-weight:700;color:#181818;">Notfall-Kontakte:</h3>
 <div style="margin:0 0 24px;padding:16px;background-color:#F4F4F4;border-radius:8px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-<tr><td style="padding:4px 12px 4px 0;vertical-align:top;white-space:nowrap;font-weight:600;color:#6B7280;">Eismeister</td><td style="padding:4px 0;vertical-align:top;"><a href="tel:+43557671011635" style="color:#000000;text-decoration:underline;">+43 5576 71011635</a></td></tr>
-<tr><td style="padding:4px 12px 4px 0;vertical-align:top;white-space:nowrap;font-weight:600;color:#6B7280;">Ausrüstungen / Verleih</td><td style="padding:4px 0;vertical-align:top;"><a href="tel:+43552235219" style="color:#000000;text-decoration:underline;">+43 5522 35 219</a></td></tr>
+<tr><td style="padding:4px 12px 4px 0;vertical-align:top;white-space:nowrap;font-weight:600;color:#6B7280;">Eismeister</td><td style="padding:4px 0;vertical-align:top;"><a href="tel:{{telefon_eismeister_link}}" style="color:#000000;text-decoration:underline;">{{telefon_eismeister}}</a></td></tr>
+<tr><td style="padding:4px 12px 4px 0;vertical-align:top;white-space:nowrap;font-weight:600;color:#6B7280;">Ausrüstungen / Verleih</td><td style="padding:4px 0;vertical-align:top;"><a href="tel:{{telefon_verleih_link}}" style="color:#000000;text-decoration:underline;">{{telefon_verleih}}</a></td></tr>
 </table>
 </div>
 

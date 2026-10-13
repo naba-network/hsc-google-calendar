@@ -61,6 +61,48 @@ final class BookingMailerTest extends TestCase
         self::assertSame('', $messages['confirmation']->attachment);
     }
 
+    public function testDraftFillsPhoneNumbers(): void
+    {
+        $template = tempnam(sys_get_temp_dir(), 'emltpl');
+        file_put_contents($template, "To: {{email}}\n\n<a href=\"tel:{{telefon_verleih_link}}\">{{telefon_verleih}}</a>");
+
+        $messages = (new Booking_Mailer(static fn (): ?string => null, 'verleih@example.test', 'SC Test - Verleih', 'club@example.test', $template, '', ['telefon_verleih' => '+43 1234 <56>']))
+            ->build($this->request(), $this->event());
+        unlink($template);
+
+        self::assertStringEndsWith('<a href="tel:+43123456">+43 1234 &lt;56&gt;</a>', $messages['notification']->attachment);
+    }
+
+    public function testNotificationHasMailtoLinkWithCcButNoCcHeader(): void
+    {
+        $messages = (new Booking_Mailer(static fn (): ?string => null, 'verleih@example.test', 'SC Test - Verleih', 'club@example.test', '', 'cc@example.test'))
+            ->build($this->request(), $this->event());
+
+        $notification = $messages['notification'];
+        self::assertStringContainsString('href="mailto:max%40example.com?subject=Verleih%20Best%C3%A4tigung%20-%20Samstag%2C%2021.11.2026%2C%2009%3A30', $notification->body);
+        self::assertStringContainsString('&amp;cc=cc%40example.test&amp;body=Hallo%20Max%20Mustermann', $notification->body);
+        self::assertStringNotContainsString('Cc', implode("\n", [...$notification->headers, ...$messages['confirmation']->headers]));
+    }
+
+    public function testCcOnlyInDraftAndDroppedWhenEmpty(): void
+    {
+        $template = tempnam(sys_get_temp_dir(), 'emltpl');
+        file_put_contents($template, "From: \"{{name}}\" <{{email}}>\nTo: {{club_email}}\nCc: {{cc}}\nSubject: x\n\nbody");
+        $build = fn (string $cc): string => (new Booking_Mailer(static fn (): ?string => null, 'verleih@example.test', 'SC Test - Verleih', 'club@example.test', $template, $cc))
+            ->build($this->request(), $this->event())['notification']->attachment;
+
+        self::assertSame("From: \"Max Mustermann\" <max@example.com>\r\nTo: club@example.test\r\nCc: cc@example.test\r\nSubject: x\r\n\r\nbody", $build('cc@example.test'));
+        self::assertSame("From: \"Max Mustermann\" <max@example.com>\r\nTo: club@example.test\r\nSubject: x\r\n\r\nbody", $build(''));
+        unlink($template);
+    }
+
+    public function testNoCcMailtoParameterWhenNotConfigured(): void
+    {
+        $this->mailer(true)->send($this->request(), $this->event());
+
+        self::assertStringNotContainsString('&amp;cc=', $this->sent[0]['body']);
+    }
+
     public function testNoAttachmentWithoutReadableTemplate(): void
     {
         $this->mailer(true)->send($this->request(), $this->event());

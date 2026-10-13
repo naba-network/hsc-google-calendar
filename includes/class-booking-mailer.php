@@ -28,28 +28,34 @@ final class Booking_Mailer {
 	/**
 	 * Creates the mailer.
 	 *
-	 * @param Closure $send       Transport: fn( Mail_Message $mail ): ?string, returns null when the mail was accepted, else the error.
-	 * @param string  $from_email Sender address.
-	 * @param string  $from_name  Sender name.
-	 * @param string  $notify_to  Address that receives the notification.
-	 * @param string  $draft_template Path to the .emltpl template of the confirmation draft, empty for no attachment.
+	 * @param Closure              $send       Transport: fn( Mail_Message $mail ): ?string, returns null when the mail was accepted, else the error.
+	 * @param string               $from_email Sender address.
+	 * @param string               $from_name  Sender name.
+	 * @param string               $notify_to  Address that receives the notification.
+	 * @param string               $draft_template Path to the .emltpl template of the confirmation draft, empty for no attachment.
+	 * @param string               $cc        Copy recipient of the confirmation draft and the mailto link, empty for none.
+	 * @param array<string,string> $phones Phone numbers for the draft, by placeholder name. A "<name>_link" placeholder holds the dialable form.
 	 */
 	public function __construct(
 		private readonly Closure $send,
 		private readonly string $from_email,
 		private readonly string $from_name,
 		private readonly string $notify_to,
-		private readonly string $draft_template = ''
+		private readonly string $draft_template = '',
+		private readonly string $cc = '',
+		private readonly array $phones = array()
 	) {}
 
 	/**
 	 * Mailer on top of wp_mail(). The envelope sender is set to the From address so SPF can align with it.
 	 *
-	 * @param string $from_email Sender address.
-	 * @param string $from_name  Sender name.
-	 * @param string $notify_to  Address that receives the notification.
+	 * @param string               $from_email Sender address.
+	 * @param string               $from_name  Sender name.
+	 * @param string               $notify_to  Address that receives the notification.
+	 * @param string               $cc        Copy recipient of the confirmation draft and the mailto link, empty for none.
+	 * @param array<string,string> $phones Phone numbers for the draft, by placeholder name (e.g. telefon_eismeister).
 	 */
-	public static function with_wordpress_mail( string $from_email, string $from_name, string $notify_to ): self {
+	public static function with_wordpress_mail( string $from_email, string $from_name, string $notify_to, string $cc = '', array $phones = array() ): self {
 		$send = static function ( Mail_Message $mail ) use ( $from_email ): ?string {
 			$error = '';
 			// Adds the plain text alternative and the attachment. The envelope sender is only set for PHP mail()/sendmail: SMTP plugins such as
@@ -81,7 +87,7 @@ final class Booking_Mailer {
 			return '' !== $error ? $error : 'wp_mail() returned false.';
 		};
 
-		return new self( $send, $from_email, $from_name, $notify_to, dirname( __DIR__ ) . '/templates/' . self::DRAFT_TEMPLATE );
+		return new self( $send, $from_email, $from_name, $notify_to, dirname( __DIR__ ) . '/templates/' . self::DRAFT_TEMPLATE, $cc, $phones );
 	}
 
 	/**
@@ -191,7 +197,12 @@ final class Booking_Mailer {
 			return '';
 		}
 
-		$values = array(
+		$values = array();
+		foreach ( $this->phones as $key => $phone ) {
+			$values[ $key ]           = $phone;
+			$values[ $key . '_link' ] = (string) preg_replace( '/[^\d+]/', '', $phone );
+		}
+		$values += array(
 			'name'            => $request->name,
 			'email'           => $request->email,
 			'telefon'         => $request->phone,
@@ -199,7 +210,9 @@ final class Booking_Mailer {
 			'uhrzeit'         => $event->time_label(),
 			'teilnehmer'      => (string) $request->participants,
 			'leihausruestung' => (string) $request->rental,
+			'club_email'      => $this->notify_to,
 			'absender_email'  => $this->from_email,
+			'cc'              => $this->cc,
 		);
 
 		$parts   = preg_split( '/\R\R/', $template, 2 );
@@ -208,10 +221,29 @@ final class Booking_Mailer {
 		$body    = self::fill( $parts[1] ?? '', array_map( array( Mail_Layout::class, 'escape' ), $values ) );
 		$headers = array();
 		foreach ( (array) preg_split( '/\R/', $head ) as $line ) {
+			if ( 'Cc: ' === $line ) {
+				continue;
+			}
 			$headers[] = str_starts_with( $line, 'Subject: ' ) ? 'Subject: ' . self::encode_header( substr( $line, 9 ) ) : $line;
 		}
 
 		return str_replace( "\n", "\r\n", str_replace( "\r\n", "\n", implode( "\n", $headers ) . "\n\n" . $body ) );
+	}
+
+	/**
+	 * Link with the mailto scheme that opens a new mail to the visitor with subject and a short plain text confirmation.
+	 * Works in every mail client, unlike the .eml draft, but cannot carry the HTML layout.
+	 *
+	 * @param Booking_Request $request Request.
+	 * @param Event           $event   Event.
+	 */
+	private function confirmation_mailto( Booking_Request $request, Event $event ): string {
+		$subject = 'Verleih Bestätigung - ' . $event->date_label() . ', ' . $event->time_label();
+		$body    = str_replace( self::LINE_BREAK, "\r\n", $this->confirmation_body( $request, $event ) );
+
+		$cc = '' !== self::single_line( $this->cc ) ? '&cc=' . rawurlencode( self::single_line( $this->cc ) ) : '';
+
+		return 'mailto:' . rawurlencode( $request->email ) . '?subject=' . rawurlencode( $subject ) . $cc . '&body=' . rawurlencode( $body );
 	}
 
 	/**
@@ -303,6 +335,7 @@ final class Booking_Mailer {
 		}
 
 		$content = '<h1 style="margin:0 0 16px;font-size:24px;line-height:28px;font-weight:700;color:#181818;">Verleih Anfrage</h1>'
+			. Mail_Layout::paragraph( '<a href="' . Mail_Layout::escape( $this->confirmation_mailto( $request, $event ) ) . '" style="color:#000000;text-decoration:underline;">Bestätigung in neuer E-Mail öffnen</a>' )
 			. '<div style="margin:0 0 24px;padding:16px;background-color:#F4F4F4;border-radius:8px;">'
 			. '<div style="font-weight:600;">-- Eintrag für Kalender --</div>' . $lines . '</div>'
 			. '<div style="margin:0 0 8px;font-weight:600;">-- E-Mail: --</div>'

@@ -25,6 +25,9 @@ final class Settings {
 	public const OPTION_MAIL_FROM   = 'hsc_gcal_mail_from';
 	public const OPTION_MAIL_NAME   = 'hsc_gcal_mail_from_name';
 	public const OPTION_MAIL_TO     = 'hsc_gcal_mail_to';
+	public const OPTION_MAIL_CC     = 'hsc_gcal_mail_cc';
+	public const OPTION_PHONE_ICE   = 'hsc_gcal_phone_ice_master';
+	public const OPTION_PHONE_RENT  = 'hsc_gcal_phone_rental';
 
 	public const DEFAULT_MAIL_FROM = 'verleih@sc-hohenems.at';
 	public const DEFAULT_MAIL_NAME = 'SC Samina Hohenems - Verleih';
@@ -118,6 +121,38 @@ final class Settings {
 	}
 
 	/**
+	 * Address that gets a copy of every booking notification, empty for none.
+	 */
+	public function mail_cc(): string {
+		return (string) get_option( self::OPTION_MAIL_CC, '' );
+	}
+
+	/**
+	 * Emergency phone number of the ice master for the confirmation draft, empty for none.
+	 */
+	public function phone_ice_master(): string {
+		return (string) get_option( self::OPTION_PHONE_ICE, '' );
+	}
+
+	/**
+	 * Emergency phone number of the equipment rental for the confirmation draft, empty for none.
+	 */
+	public function phone_rental(): string {
+		return (string) get_option( self::OPTION_PHONE_RENT, '' );
+	}
+
+	/**
+	 * Saves the emergency phone numbers.
+	 *
+	 * @param string $ice_master Ice master.
+	 * @param string $rental     Equipment rental.
+	 */
+	public function save_phones( string $ice_master, string $rental ): void {
+		update_option( self::OPTION_PHONE_ICE, $ice_master, false );
+		update_option( self::OPTION_PHONE_RENT, $rental, false );
+	}
+
+	/**
 	 * Saves the booked-event regex.
 	 *
 	 * @param string $regex Pattern without delimiters (already validated by the caller).
@@ -132,11 +167,13 @@ final class Settings {
 	 * @param string $from Sender address.
 	 * @param string $name Sender name.
 	 * @param string $to   Notification recipient.
+	 * @param string $cc  Copy recipient of the notification, '' for none.
 	 */
-	public function save_mail( string $from, string $name, string $to ): void {
+	public function save_mail( string $from, string $name, string $to, string $cc = '' ): void {
 		update_option( self::OPTION_MAIL_FROM, $from, false );
 		update_option( self::OPTION_MAIL_NAME, $name, false );
 		update_option( self::OPTION_MAIL_TO, $to, false );
+		update_option( self::OPTION_MAIL_CC, $cc, false );
 	}
 
 	/**
