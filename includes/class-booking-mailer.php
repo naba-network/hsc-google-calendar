@@ -22,6 +22,9 @@ final class Booking_Mailer {
 
 	private const LINE_BREAK = "\n";
 
+	private const DRAFT_FILE_NAME = 'verleih-bestaetigung.eml';
+	private const DRAFT_TEMPLATE  = 'verleih-buchung.emltpl';
+
 	/**
 	 * Creates the mailer.
 	 *
@@ -29,12 +32,14 @@ final class Booking_Mailer {
 	 * @param string  $from_email Sender address.
 	 * @param string  $from_name  Sender name.
 	 * @param string  $notify_to  Address that receives the notification.
+	 * @param string  $draft_template Path to the .emltpl template of the confirmation draft, empty for no attachment.
 	 */
 	public function __construct(
 		private readonly Closure $send,
 		private readonly string $from_email,
 		private readonly string $from_name,
-		private readonly string $notify_to
+		private readonly string $notify_to,
+		private readonly string $draft_template = ''
 	) {}
 
 	/**
@@ -47,11 +52,14 @@ final class Booking_Mailer {
 	public static function with_wordpress_mail( string $from_email, string $from_name, string $notify_to ): self {
 		$send = static function ( Mail_Message $mail ) use ( $from_email ): ?string {
 			$error = '';
-			// Adds the plain text alternative. The envelope sender is only set for PHP mail()/sendmail: SMTP plugins such as
+			// Adds the plain text alternative and the attachment. The envelope sender is only set for PHP mail()/sendmail: SMTP plugins such as
 			// WP Mail SMTP choose it themselves, and an address the SMTP account does not own would be rejected.
 			$set_sender = static function ( $phpmailer ) use ( $from_email, $mail ): void {
 				if ( '' !== $mail->alt_body ) {
 					$phpmailer->AltBody = $mail->alt_body; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- PHPMailer property.
+				}
+				if ( '' !== $mail->attachment ) {
+					$phpmailer->addStringAttachment( $mail->attachment, $mail->attachment_name, 'base64', 'message/rfc822' );
 				}
 				if ( in_array( $phpmailer->Mailer, array( 'mail', 'sendmail' ), true ) ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- PHPMailer property.
 					$phpmailer->Sender = $from_email; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- PHPMailer property.
@@ -73,7 +81,7 @@ final class Booking_Mailer {
 			return '' !== $error ? $error : 'wp_mail() returned false.';
 		};
 
-		return new self( $send, $from_email, $from_name, $notify_to );
+		return new self( $send, $from_email, $from_name, $notify_to, dirname( __DIR__ ) . '/templates/' . self::DRAFT_TEMPLATE );
 	}
 
 	/**
@@ -113,7 +121,9 @@ final class Booking_Mailer {
 				'Verleih Anfrage - ' . self::header_value( $request->name ) . ' - ' . $slot,
 				$this->notification_html( $request, $event ),
 				$this->headers( self::header_value( $request->name ) . ' <' . $request->email . '>' ),
-				$this->notification_body( $request, $event )
+				$this->notification_body( $request, $event ),
+				$this->confirmation_draft( $request, $event ),
+				self::DRAFT_FILE_NAME
 			),
 			'confirmation' => new Mail_Message(
 				$request->email,
@@ -164,6 +174,73 @@ final class Booking_Mailer {
 	 */
 	public function deliver( Mail_Message $mail ): ?string {
 		return ( $this->send )( $mail );
+	}
+
+	/**
+	 * Confirmation to the visitor as an unsent .eml draft, filled from the template. The club opens it in its own
+	 * mail client and sends it from there. Empty when no template is configured or it cannot be read.
+	 *
+	 * Placeholders like {{name}} are replaced in the headers (no line breaks, no angle brackets) and escaped in the HTML body.
+	 *
+	 * @param Booking_Request $request Request.
+	 * @param Event           $event   Event.
+	 */
+	private function confirmation_draft( Booking_Request $request, Event $event ): string {
+		$template = '' !== $this->draft_template && is_readable( $this->draft_template ) ? file_get_contents( $this->draft_template ) : false; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local template file.
+		if ( false === $template ) {
+			return '';
+		}
+
+		$values = array(
+			'name'            => $request->name,
+			'email'           => $request->email,
+			'telefon'         => $request->phone,
+			'datum'           => $event->date_label(),
+			'uhrzeit'         => $event->time_label(),
+			'teilnehmer'      => (string) $request->participants,
+			'leihausruestung' => (string) $request->rental,
+			'absender_email'  => $this->from_email,
+		);
+
+		$parts   = preg_split( '/\R\R/', $template, 2 );
+		$parts   = false === $parts ? array( $template ) : $parts;
+		$head    = self::fill( $parts[0], array_map( array( self::class, 'single_line' ), $values ) );
+		$body    = self::fill( $parts[1] ?? '', array_map( array( Mail_Layout::class, 'escape' ), $values ) );
+		$headers = array();
+		foreach ( (array) preg_split( '/\R/', $head ) as $line ) {
+			$headers[] = str_starts_with( $line, 'Subject: ' ) ? 'Subject: ' . self::encode_header( substr( $line, 9 ) ) : $line;
+		}
+
+		return str_replace( "\n", "\r\n", str_replace( "\r\n", "\n", implode( "\n", $headers ) . "\n\n" . $body ) );
+	}
+
+	/**
+	 * Replaces {{key}} placeholders.
+	 *
+	 * @param string               $text   Template text.
+	 * @param array<string,string> $values Replacement per key.
+	 */
+	private static function fill( string $text, array $values ): string {
+		$map = array();
+		foreach ( $values as $key => $value ) {
+			$map[ '{{' . $key . '}}' ] = $value;
+		}
+
+		return strtr( $text, $map );
+	}
+
+	/**
+	 * Encodes a header value as RFC 2047 when it has non-ASCII characters (umlauts in the subject).
+	 *
+	 * @param string $value Header value without name.
+	 */
+	private static function encode_header( string $value ): string {
+		if ( 1 !== preg_match( '/[^\x20-\x7E]/', $value ) ) {
+			return $value;
+		}
+
+		// RFC 2047 header encoding, not obfuscation.
+		return '=?UTF-8?B?' . base64_encode( $value ) . '?='; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 	}
 
 	/**
@@ -314,6 +391,15 @@ final class Booking_Mailer {
 		}
 
 		return $headers;
+	}
+
+	/**
+	 * Makes a user supplied string safe inside one header line: no line breaks (header injection), no angle brackets or quotes.
+	 *
+	 * @param string $value Raw value.
+	 */
+	private static function single_line( string $value ): string {
+		return trim( (string) preg_replace( '/[\r\n<>"]+/', ' ', $value ) );
 	}
 
 	/**

@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 final class BookingMailerTest extends TestCase
 {
-    /** @var list<array{to: string, subject: string, body: string, alt_body: string, headers: list<string>}> */
+    /** @var list<array{to: string, subject: string, body: string, alt_body: string, attachment: string, headers: list<string>}> */
     private array $sent = [];
 
     public function testSendsNotificationAndConfirmation(): void
@@ -35,6 +35,37 @@ final class BookingMailerTest extends TestCase
         self::assertContains('From: SC Test - Verleih <verleih@example.test>', $visitor['headers']);
         self::assertStringNotContainsString('Reply-To', implode("\n", $visitor['headers']));
         self::assertStringContainsString('Hallo Max Mustermann,', $visitor['body']);
+    }
+
+    public function testNotificationCarriesFilledConfirmationDraft(): void
+    {
+        $template = tempnam(sys_get_temp_dir(), 'emltpl');
+        file_put_contents($template, "X-Unsent: 1\nTo: {{email}}\nSubject: Bestätigung {{datum}}\n\n<p>Hallo {{name}}, {{teilnehmer}} / {{leihausruestung}} / {{unknown}}</p>");
+
+        $messages = (new Booking_Mailer(static fn (): ?string => null, 'verleih@example.test', 'SC Test - Verleih', 'club@example.test', $template))
+            ->build(Booking_Request::from_array([
+                'name' => '<b>Max</b>',
+                'email' => 'max@example.com',
+                'phone' => '+43 660 0000001',
+                'participants' => '4',
+                'rental' => '2',
+            ]), $this->event());
+        unlink($template);
+
+        $notification = $messages['notification'];
+        self::assertSame('verleih-bestaetigung.eml', $notification->attachment_name);
+        self::assertSame(
+            "X-Unsent: 1\r\nTo: max@example.com\r\nSubject: =?UTF-8?B?" . base64_encode('Bestätigung Samstag, 21.11.2026') . "?=\r\n\r\n<p>Hallo &lt;b&gt;Max&lt;/b&gt;, 4 / 2 / {{unknown}}</p>",
+            $notification->attachment
+        );
+        self::assertSame('', $messages['confirmation']->attachment);
+    }
+
+    public function testNoAttachmentWithoutReadableTemplate(): void
+    {
+        $this->mailer(true)->send($this->request(), $this->event());
+
+        self::assertSame('', $this->sent[0]['attachment']);
     }
 
     public function testHtmlBodyUsesCardLayoutAndBrand(): void
@@ -131,6 +162,7 @@ final class BookingMailerTest extends TestCase
         self::assertSame('[TEST] ' . $messages['notification']->subject, $test->subject);
         self::assertSame($messages['notification']->body, $test->body);
         self::assertSame($messages['notification']->headers, $test->headers);
+        self::assertSame($messages['notification']->attachment, $test->attachment);
     }
 
     public function testTestSendDeliversBothMailsToTheTestAddressOnly(): void
@@ -170,7 +202,7 @@ final class BookingMailerTest extends TestCase
     {
         $calls = 0;
         $send = function (Mail_Message $mail) use (&$calls, $notificationSucceeds): ?string {
-            $this->sent[] = ['to' => $mail->to, 'subject' => $mail->subject, 'body' => $mail->body, 'alt_body' => $mail->alt_body, 'headers' => $mail->headers];
+            $this->sent[] = ['to' => $mail->to, 'subject' => $mail->subject, 'body' => $mail->body, 'alt_body' => $mail->alt_body, 'attachment' => $mail->attachment, 'headers' => $mail->headers];
 
             return 1 !== ++$calls || $notificationSucceeds ? null : 'transport down';
         };

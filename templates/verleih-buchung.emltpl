@@ -1,0 +1,92 @@
+X-Unsent: 1
+From: SC Samina Hohenems - Verleih <{{absender_email}}>
+To: {{email}}
+Subject: Verleih Bestätigung - {{datum}}, {{uhrzeit}}
+MIME-Version: 1.0
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Verleih Bestätigung</title></head>
+<body style="margin:0;padding:0;background-color:#F4F4F4;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#181818;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#F4F4F4" style="border-collapse:collapse;width:100%;background-color:#F4F4F4;"><tr>
+<td align="center" style="font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#181818;padding:48px 16px;">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="border-collapse:separate;width:100%;max-width:640px;background-color:#FFFFFF;border-radius:12px;border:1px solid #E5E7EB;">
+
+<tr><td style="font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:24px 24px 0;"><h2 style="margin:0;font-size:20px;line-height:24px;font-weight:700;color:#181818;">SC Samina Hohenems - Verleih</h2></td></tr>
+
+<tr><td style="font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#181818;padding:24px;text-align:left;">
+
+<h1 style="margin:0 0 16px;font-size:24px;line-height:28px;font-weight:700;color:#181818;">Verleih Bestätigung</h1>
+
+<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:#181818;">Hallo {{name}},</p>
+
+<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:#181818;">Vielen Dank für die Buchung, gerne bestätigen wir dir den <strong>Verleih-Termin</strong> im Eisstadion Hohenems.</p>
+
+<!-- Termin-Übersicht -->
+<h3 style="margin:0 0 8px;font-size:18px;line-height:24px;font-weight:700;color:#181818;">Deine Termin-Übersicht</h3>
+<div style="margin:0 0 24px;padding:16px;background-color:#F4F4F4;border-radius:8px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+<tr><td style="padding:8px 12px 8px 0;vertical-align:top;white-space:nowrap;font-weight:600;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;color:#6B7280;">Datum</td><td style="padding:8px 0;vertical-align:top;">{{datum}}, {{uhrzeit}}</td></tr>
+<tr><td style="padding:8px 12px 8px 0;vertical-align:top;white-space:nowrap;font-weight:600;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;color:#6B7280;">Teilnehmerzahl</td><td style="padding:8px 0;vertical-align:top;">{{teilnehmer}} Personen</td></tr>
+<tr><td style="padding:8px 12px 8px 0;vertical-align:top;white-space:nowrap;font-weight:600;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;color:#6B7280;">Ausrüstungen</td><td style="padding:8px 0;vertical-align:top;">{{leihausruestung}} Ausrüstungen</td></tr>
+<tr><td style="padding:8px 12px 8px 0;vertical-align:top;white-space:nowrap;font-weight:600;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;color:#6B7280;">Ansprechperson</td><td style="padding:8px 0;vertical-align:top;">{{name}} - {{telefon}}</td></tr>
+</table>
+</div>
+
+<!-- Wichtige Links -->
+<h3 style="margin:0 0 8px;font-size:18px;line-height:24px;font-weight:700;color:#181818;">Wichtige Links</h3>
+<p style="margin:0 0 24px;font-size:16px;line-height:24px;color:#181818;">Hier findest du alle <a href="https://sc-hohenems.at" style="color:#000000;text-decoration:underline;">Preise</a><br>Hier findest du <a href="https://sc-hohenems.at" style="color:#000000;text-decoration:underline;">häufig gestellte Fragen</a></p>
+
+<!-- Checkliste -->
+<h3 style="margin:0 0 8px;font-size:18px;line-height:24px;font-weight:700;color:#181818;">Termin-Checkliste für euren Besuch im Stadion</h3>
+<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:#181818;">Wir freuen uns riesig, euch bald bei uns begrüßen zu dürfen! Damit ihr euren Termin in vollen Zügen genießen könnt, hier ein paar hilfreiche Tipps:</p>
+<ul style="margin:0 0 24px;padding:0 0 0 20px;font-size:16px;line-height:24px;color:#181818;">
+<li style="margin:0 0 8px;"><strong>Kommt am besten 45 Minuten vor eurem Termin,</strong> damit ihr entspannt ankommen und euch in Ruhe vorbereiten könnt.</li>
+<li style="margin:0 0 8px;">Vergesst bitte nicht eure <strong>Skiunterwäsche, Skisocken und Duschzeug</strong> – so seid ihr perfekt ausgestattet.</li>
+<li style="margin:0 0 8px;">Eure Ausrüstung wartet schon auf euch:<br><span style="color:#6B7280;">→ Geht beim Eingang links den langen Gang entlang bis zum Verleihbüro. Die Tür auf der rechten Seite führt euch ans Ziel.</span></li>
+<li style="margin:0 0 8px;">Braucht ihr Eislaufschuhe? Kein Problem! Gebt uns einfach vor Ort eure Schuhgröße durch, und wir kümmern uns darum.</li>
+<li style="margin:0 0 8px;">Vor und nach jedem Termin wird das Eis frisch gereinigt.<br><span style="color:#6B7280;">→ Während die Eismaschine unterwegs ist, bitten wir euch, nicht auf die Eisfläche zu gehen – dann ist das Eis nachher perfekt für euch vorbereitet!</span></li>
+<li style="margin:0 0 8px;">Tore und Pucks stehen schon bereit – ihr könnt direkt loslegen und Spaß haben!</li>
+<li style="margin:0 0 8px;">Nach eurem Termin lasst ihr die Ausrüstung einfach in der Kabine – wir räumen alles für euch weg.</li>
+<li style="margin:0 0 8px;">Zum Abschluss laden wir euch ein, im warmen Clubheim gemütlich bei Drinks und Snacks zusammenzusitzen und euer Event in aller Ruhe ausklingen zu lassen. 😊</li>
+</ul>
+
+<!-- Bezahlung -->
+<h3 style="margin:0 0 8px;font-size:18px;line-height:24px;font-weight:700;color:#181818;">Bezahlung – So funktioniert’s:</h3>
+<ul style="margin:0 0 24px;padding:0 0 0 20px;font-size:16px;line-height:24px;color:#181818;">
+<li style="margin:0 0 8px;">Die Miete der Eisfläche bezahlt ihr direkt beim Eismeister. Sein Büro findet ihr beim Eingang rechts, dort, wo die Eismaschine aufs Eis fährt.</li>
+<li style="margin:0 0 8px;">Die Ausrüstungen könnt ihr ganz bequem bei der Vergabestelle bezahlen.</li>
+<li style="margin:0 0 8px;"><strong>Wichtig:</strong> Bitte bringt ausreichend Bargeld mit, da die Bezahlung nur bar möglich ist.</li>
+</ul>
+
+<!-- Storno -->
+<h3 style="margin:0 0 8px;font-size:18px;line-height:24px;font-weight:700;color:#181818;">Termin stornieren – das müsst ihr wissen:</h3>
+<ul style="margin:0 0 24px;padding:0 0 0 20px;font-size:16px;line-height:24px;color:#181818;">
+<li style="margin:0 0 8px;">Falls ihr euren Termin absagen müsst, gebt uns bitte mindestens <strong>72 Stunden vorher</strong> schriftlich Bescheid.<br><span style="color:#6B7280;">→ Bei späteren Stornierungen müssen wir euch leider 30 % der Kosten (Platzmiete + Ausrüstungen) berechnen.</span></li>
+<li style="margin:0 0 8px;">Sollte es von unserer Seite zu einer Absage kommen (z. B. wegen schlechtem Wetter, technischen Problemen oder außergewöhnlichen Umständen wie COVID),<br><span style="color:#6B7280;">→ melden wir uns natürlich telefonisch bei eurem angegebenen Ansprechpartner. In diesem Fall fallen keine Kosten für euch an.</span></li>
+</ul>
+
+<!-- Notfall -->
+<h3 style="margin:0 0 8px;font-size:18px;line-height:24px;font-weight:700;color:#181818;">Notfall-Kontakte:</h3>
+<div style="margin:0 0 24px;padding:16px;background-color:#F4F4F4;border-radius:8px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+<tr><td style="padding:4px 12px 4px 0;vertical-align:top;white-space:nowrap;font-weight:600;color:#6B7280;">Eismeister</td><td style="padding:4px 0;vertical-align:top;"><a href="tel:+43557671011635" style="color:#000000;text-decoration:underline;">+43 5576 71011635</a></td></tr>
+<tr><td style="padding:4px 12px 4px 0;vertical-align:top;white-space:nowrap;font-weight:600;color:#6B7280;">Ausrüstungen / Verleih</td><td style="padding:4px 0;vertical-align:top;"><a href="tel:+43552235219" style="color:#000000;text-decoration:underline;">+43 5522 35 219</a></td></tr>
+</table>
+</div>
+
+<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:#181818;"><strong>Jetzt seid ihr perfekt vorbereitet!</strong></p>
+<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:#181818;">Falls dennoch Fragen offen sind, zögert bitte nicht, euch bei uns zu melden – wir helfen euch gerne weiter. 😊</p>
+<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:#181818;">Ansonsten freuen wir uns schon riesig, euch bald im Stadion willkommen zu heißen! Bis bald! 🎉</p>
+<p style="margin:0;font-size:16px;line-height:24px;color:#181818;">Sportliche Grüße<br>SC Samina Hohenems</p>
+
+</td></tr>
+</table>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:640px;"><tr>
+<td style="font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:24px;font-size:13px;line-height:20px;color:#6B7280;"><a href="https://sc-hohenems.at" style="color:#000000;text-decoration:underline;">sc-hohenems.at</a></td>
+</tr></table>
+
+</td></tr></table>
+</body></html>
