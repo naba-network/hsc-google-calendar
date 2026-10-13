@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 Versions are generated automatically on push to `production`.
 
+## [0.2.0] - 2026-10-13
+
+### Added
+
+- attach confirmation draft as .eml to the club notification
+
 ## [0.1.7] - 2026-10-08
 
 ### Fixed
