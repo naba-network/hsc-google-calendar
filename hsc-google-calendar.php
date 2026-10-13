@@ -42,6 +42,7 @@ require_once __DIR__ . '/includes/class-mail-message.php';
 require_once __DIR__ . '/includes/class-mail-layout.php';
 require_once __DIR__ . '/includes/class-booking-mailer.php';
 require_once __DIR__ . '/includes/class-date-range.php';
+require_once __DIR__ . '/includes/class-calendar-block.php';
 require_once __DIR__ . '/includes/class-event-source.php';
 require_once __DIR__ . '/includes/class-booking-controller.php';
 require_once __DIR__ . '/includes/class-shortcodes.php';

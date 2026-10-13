@@ -23,10 +23,23 @@ final class Admin_Page {
 	public const ACTION_SAVE = 'hsc_gcal_save_settings';
 	public const ACTION_TEST = 'hsc_gcal_test_connection';
 	public const ACTION_MAIL = 'hsc_gcal_test_mail';
+	public const ACTION_FILL = 'hsc_gcal_prefill_mail';
 
-	private const FIELD_TEST_TO   = 'hsc_test_to';
-	private const TRANSIENT_MAIL  = 'hsc_gcal_mail_test_';
-	private const MAIL_RESULT_TTL = 600;
+	private const FIELD_TEST_TO           = 'hsc_test_to';
+	private const FIELD_TEST_EMAIL        = 'hsc_test_email';
+	private const FIELD_TEST_NAME         = 'hsc_test_name';
+	private const FIELD_TEST_PHONE        = 'hsc_test_phone';
+	private const FIELD_TEST_PARTICIPANTS = 'hsc_test_participants';
+	private const FIELD_TEST_RENTAL       = 'hsc_test_rental';
+	private const FIELD_TEST_MESSAGE      = 'hsc_test_message';
+	private const FIELD_TEST_START        = 'hsc_test_start';
+	private const FIELD_TEST_END          = 'hsc_test_end';
+	private const FIELD_TEST_SCOPE        = 'hsc_test_scope';
+	private const INPUT_DATETIME          = 'Y-m-d\TH:i';
+	private const TRANSIENT_MAIL          = 'hsc_gcal_mail_test_';
+	private const TRANSIENT_FORM          = 'hsc_gcal_mail_form_';
+	private const FIELD_TEST_BLOCK        = 'hsc_test_block';
+	private const MAIL_RESULT_TTL         = 600;
 
 	private const FIELD_CALENDAR_ID = 'hsc_calendar_id';
 	private const FIELD_CREDENTIALS = 'hsc_service_account';
@@ -73,6 +86,7 @@ final class Admin_Page {
 		add_action( 'admin_post_' . self::ACTION_SAVE, array( $this, 'handle_save_settings' ) );
 		add_action( 'admin_post_' . self::ACTION_TEST, array( $this, 'handle_test_connection' ) );
 		add_action( 'admin_post_' . self::ACTION_MAIL, array( $this, 'handle_test_mail' ) );
+		add_action( 'admin_post_' . self::ACTION_FILL, array( $this, 'handle_prefill_mail' ) );
 	}
 
 	/**
@@ -168,32 +182,56 @@ final class Admin_Page {
 	}
 
 	/**
-	 * Sends both booking e-mails with sample data to the given address and stores what was sent, so it can be shown.
+	 * Sends the test e-mails (both, only the club mail or only the visitor mail) with the entered data
+	 * to the given address and stores what was sent, so it can be shown.
 	 */
 	public function handle_test_mail(): void {
 		$this->authorize( self::ACTION_MAIL );
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce checked in authorize().
-		$to      = isset( $_POST[ self::FIELD_TEST_TO ] ) ? sanitize_email( wp_unslash( (string) $_POST[ self::FIELD_TEST_TO ] ) ) : '';
-		$key     = self::TRANSIENT_MAIL . get_current_user_id();
+		$form  = $this->posted_test_form();
+		$to    = $form[ self::FIELD_TEST_TO ];
+		$scope = $form[ self::FIELD_TEST_SCOPE ];
+		$key   = self::TRANSIENT_MAIL . get_current_user_id();
+		set_transient( self::TRANSIENT_FORM . get_current_user_id(), $form, self::MAIL_RESULT_TTL );
+
 		$results = array(
 			'to'    => $to,
 			'sent'  => time(),
+			'form'  => $form,
 			'mails' => array(),
 		);
 
+		$start   = \DateTimeImmutable::createFromFormat( self::INPUT_DATETIME, $form[ self::FIELD_TEST_START ], wp_timezone() );
+		$end     = \DateTimeImmutable::createFromFormat( self::INPUT_DATETIME, $form[ self::FIELD_TEST_END ], wp_timezone() );
+		$sample  = Booking_Request::from_array(
+			array(
+				Booking_Request::FIELD_NAME         => $form[ self::FIELD_TEST_NAME ],
+				Booking_Request::FIELD_EMAIL        => '' !== $form[ self::FIELD_TEST_EMAIL ] ? $form[ self::FIELD_TEST_EMAIL ] : $to,
+				Booking_Request::FIELD_PHONE        => $form[ self::FIELD_TEST_PHONE ],
+				Booking_Request::FIELD_PARTICIPANTS => $form[ self::FIELD_TEST_PARTICIPANTS ],
+				Booking_Request::FIELD_RENTAL       => $form[ self::FIELD_TEST_RENTAL ],
+				Booking_Request::FIELD_MESSAGE      => $form[ self::FIELD_TEST_MESSAGE ],
+			)
+		);
+		$invalid = array_keys( $sample->errors() );
+
 		if ( ! is_email( $to ) ) {
 			$results['error'] = 'Please enter a valid e-mail address.';
+		} elseif ( false === $start ) {
+			$results['error'] = 'Please enter a valid start date and time.';
+		} elseif ( array() !== $invalid ) {
+			$results['error'] = 'Please check these fields: ' . implode( ', ', $invalid ) . '.';
+		}
+
+		if ( false === $start || isset( $results['error'] ) ) {
 			set_transient( $key, $results, self::MAIL_RESULT_TTL );
 			$this->redirect_back( 'mailtested' );
 		}
 
-		$start  = new \DateTimeImmutable( 'next saturday 10:00', wp_timezone() );
-		$event  = new Event( 'test-event', 'Freie Eiszeit', '', $start->format( DATE_ATOM ), $start->modify( '+90 minutes' )->format( DATE_ATOM ), false );
-		$sample = new Booking_Request( $event->id, 'Max Mustermann', $to, '+43 660 0000000', 4, 2, 'Das ist eine Test-Anfrage.', '' );
+		$event = new Event( 'test-event', 'Freie Eiszeit', '', $start->format( DATE_ATOM ), false !== $end ? $end->format( DATE_ATOM ) : $start->format( DATE_ATOM ), false );
 
-		// Both mails go to the test address, never to the real club inbox or a sample visitor.
-		foreach ( $this->mailer->send_test( $sample, $event, $to ) as $result ) {
+		// The mails go to the test address, never to the real club inbox or a sample visitor.
+		foreach ( $this->mailer->send_test( $sample, $event, $to, $scope ) as $result ) {
 			$results['mails'][] = array(
 				'label'   => $result['label'],
 				'error'   => $result['error'],
@@ -206,6 +244,67 @@ final class Admin_Page {
 
 		set_transient( $key, $results, self::MAIL_RESULT_TTL );
 		$this->redirect_back( 'mailtested' );
+	}
+
+	/**
+	 * Fills the test form from a pasted "-- Eintrag für Kalender --" block. Nothing is sent.
+	 */
+	public function handle_prefill_mail(): void {
+		$this->authorize( self::ACTION_FILL );
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce checked in authorize().
+		$block = isset( $_POST[ self::FIELD_TEST_BLOCK ] ) ? sanitize_textarea_field( wp_unslash( (string) $_POST[ self::FIELD_TEST_BLOCK ] ) ) : '';
+		$key   = self::TRANSIENT_FORM . get_current_user_id();
+		$form  = get_transient( $key );
+		$form  = is_array( $form ) ? $form : array();
+
+		$map    = array(
+			Calendar_Block::KEY_NAME         => self::FIELD_TEST_NAME,
+			Calendar_Block::KEY_EMAIL        => self::FIELD_TEST_EMAIL,
+			Calendar_Block::KEY_PHONE        => self::FIELD_TEST_PHONE,
+			Calendar_Block::KEY_PARTICIPANTS => self::FIELD_TEST_PARTICIPANTS,
+			Calendar_Block::KEY_RENTAL       => self::FIELD_TEST_RENTAL,
+			Calendar_Block::KEY_START        => self::FIELD_TEST_START,
+			Calendar_Block::KEY_END          => self::FIELD_TEST_END,
+		);
+		$parsed = Calendar_Block::parse( $block );
+		foreach ( $map as $block_key => $field ) {
+			if ( isset( $parsed[ $block_key ] ) ) {
+				$form[ $field ] = $parsed[ $block_key ];
+			}
+		}
+		// A block without end time must not keep the end of an earlier entry.
+		if ( isset( $parsed[ Calendar_Block::KEY_START ] ) && ! isset( $parsed[ Calendar_Block::KEY_END ] ) ) {
+			$form[ self::FIELD_TEST_END ] = '';
+		}
+
+		set_transient( $key, $form, self::MAIL_RESULT_TTL );
+		$this->redirect_back( array() === $parsed ? 'blockempty' : 'blockfilled' );
+	}
+
+	/**
+	 * The posted test form, sanitized. Validation happens in the handler.
+	 *
+	 * @return array<string, string> Field name => value.
+	 */
+	private function posted_test_form(): array {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- Nonce checked in authorize().
+		$text  = static fn ( string $field ): string => isset( $_POST[ $field ] ) ? sanitize_text_field( wp_unslash( (string) $_POST[ $field ] ) ) : '';
+		$scope = $text( self::FIELD_TEST_SCOPE );
+
+		return array(
+			self::FIELD_TEST_TO           => isset( $_POST[ self::FIELD_TEST_TO ] ) ? sanitize_email( wp_unslash( (string) $_POST[ self::FIELD_TEST_TO ] ) ) : '',
+			self::FIELD_TEST_EMAIL        => isset( $_POST[ self::FIELD_TEST_EMAIL ] ) ? sanitize_email( wp_unslash( (string) $_POST[ self::FIELD_TEST_EMAIL ] ) ) : '',
+			self::FIELD_TEST_NAME         => $text( self::FIELD_TEST_NAME ),
+			self::FIELD_TEST_PHONE        => $text( self::FIELD_TEST_PHONE ),
+			self::FIELD_TEST_PARTICIPANTS => $text( self::FIELD_TEST_PARTICIPANTS ),
+			self::FIELD_TEST_RENTAL       => $text( self::FIELD_TEST_RENTAL ),
+			self::FIELD_TEST_MESSAGE      => isset( $_POST[ self::FIELD_TEST_MESSAGE ] ) ? sanitize_textarea_field( wp_unslash( (string) $_POST[ self::FIELD_TEST_MESSAGE ] ) ) : '',
+			self::FIELD_TEST_START        => $text( self::FIELD_TEST_START ),
+			self::FIELD_TEST_END          => $text( self::FIELD_TEST_END ),
+			self::FIELD_TEST_SCOPE        => in_array( $scope, array( Booking_Mailer::SCOPE_CLUB, Booking_Mailer::SCOPE_CUSTOMER ), true ) ? $scope : Booking_Mailer::SCOPE_BOTH,
+		);
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
 	}
 
 	/**
@@ -397,10 +496,88 @@ final class Admin_Page {
 	 * Renders the e-mail test: send form and the content of the last test send.
 	 */
 	private function render_mail_test_card(): void {
-		$last = get_transient( self::TRANSIENT_MAIL . get_current_user_id() );
-		$last = is_array( $last ) ? $last : null;
-		$user = wp_get_current_user();
-		$to   = null !== $last && is_string( $last['to'] ?? null ) && '' !== $last['to'] ? $last['to'] : $user->user_email;
+		$last  = get_transient( self::TRANSIENT_MAIL . get_current_user_id() );
+		$last  = is_array( $last ) ? $last : null;
+		$user  = wp_get_current_user();
+		$saved = get_transient( self::TRANSIENT_FORM . get_current_user_id() );
+		$saved = is_array( $saved ) ? $saved : array();
+		$value = static fn ( string $field, string $fallback ): string => is_string( $saved[ $field ] ?? null ) && '' !== $saved[ $field ] ? $saved[ $field ] : $fallback;
+		$start = new \DateTimeImmutable( 'next saturday 10:00', wp_timezone() );
+
+		$fields = array(
+			array(
+				'name'     => self::FIELD_TEST_TO,
+				'label'    => __( 'Send test mails to', 'hsc-google-calendar' ),
+				'type'     => 'email',
+				'required' => true,
+				'hint'     => __( 'The test mails are delivered to this address only. It stands in for the customer e-mail when that field is empty.', 'hsc-google-calendar' ),
+				'value'    => $value( self::FIELD_TEST_TO, $user->user_email ),
+			),
+			array(
+				'name'     => self::FIELD_TEST_EMAIL,
+				'label'    => __( 'Customer e-mail', 'hsc-google-calendar' ),
+				'type'     => 'email',
+				'required' => false,
+				'hint'     => __( 'Shown in Reply-To, the drafts and the mailto link. Nothing is sent to it.', 'hsc-google-calendar' ),
+				'value'    => $value( self::FIELD_TEST_EMAIL, '' ),
+			),
+			array(
+				'name'     => self::FIELD_TEST_NAME,
+				'label'    => __( 'Customer name', 'hsc-google-calendar' ),
+				'type'     => 'text',
+				'required' => true,
+				'hint'     => '',
+				'value'    => $value( self::FIELD_TEST_NAME, 'Max Mustermann' ),
+			),
+			array(
+				'name'     => self::FIELD_TEST_PHONE,
+				'label'    => __( 'Customer phone', 'hsc-google-calendar' ),
+				'type'     => 'tel',
+				'required' => true,
+				'hint'     => '',
+				'value'    => $value( self::FIELD_TEST_PHONE, '+43 660 0000000' ),
+			),
+			array(
+				'name'     => self::FIELD_TEST_PARTICIPANTS,
+				'label'    => __( 'Participants', 'hsc-google-calendar' ),
+				'type'     => 'number',
+				'required' => true,
+				'hint'     => '',
+				'value'    => $value( self::FIELD_TEST_PARTICIPANTS, '4' ),
+			),
+			array(
+				'name'     => self::FIELD_TEST_RENTAL,
+				'label'    => __( 'Rental gear', 'hsc-google-calendar' ),
+				'type'     => 'number',
+				'required' => true,
+				'hint'     => '',
+				'value'    => $value( self::FIELD_TEST_RENTAL, '2' ),
+			),
+			array(
+				'name'     => self::FIELD_TEST_START,
+				'label'    => __( 'Start', 'hsc-google-calendar' ),
+				'type'     => 'datetime-local',
+				'required' => true,
+				'hint'     => '',
+				'value'    => $value( self::FIELD_TEST_START, $start->format( self::INPUT_DATETIME ) ),
+			),
+			array(
+				'name'     => self::FIELD_TEST_END,
+				'label'    => __( 'End', 'hsc-google-calendar' ),
+				'type'     => 'datetime-local',
+				'required' => false,
+				'hint'     => '',
+				'value'    => $value( self::FIELD_TEST_END, $start->modify( '+90 minutes' )->format( self::INPUT_DATETIME ) ),
+			),
+			array(
+				'name'     => self::FIELD_TEST_MESSAGE,
+				'label'    => __( 'Message', 'hsc-google-calendar' ),
+				'type'     => 'textarea',
+				'required' => false,
+				'hint'     => '',
+				'value'    => $value( self::FIELD_TEST_MESSAGE, 'Das ist eine Test-Anfrage.' ),
+			),
+		);
 		?>
 		<div class="card">
 			<h2><?php esc_html_e( 'Test e-mails', 'hsc-google-calendar' ); ?></h2>
@@ -415,15 +592,47 @@ final class Admin_Page {
 				);
 				?>
 			</p>
+			<?php // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only notice. ?>
+			<?php if ( isset( $_GET[ self::QUERY_NOTICE ] ) && 'blockempty' === sanitize_key( wp_unslash( (string) $_GET[ self::QUERY_NOTICE ] ) ) ) : ?>
+				<div class="notice notice-warning inline"><p><?php esc_html_e( 'No booking data found in the pasted text. Expected lines like "Name: …" and "Datum: …".', 'hsc-google-calendar' ); ?></p></div>
+			<?php endif; ?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION_FILL ); ?>">
+				<?php wp_nonce_field( self::ACTION_FILL ); ?>
+				<p>
+					<label for="<?php echo esc_attr( self::FIELD_TEST_BLOCK ); ?>"><strong><?php esc_html_e( 'Prefill from a booking', 'hsc-google-calendar' ); ?></strong></label><br>
+					<textarea class="large-text code" rows="7" id="<?php echo esc_attr( self::FIELD_TEST_BLOCK ); ?>" name="<?php echo esc_attr( self::FIELD_TEST_BLOCK ); ?>" placeholder="<?php echo esc_attr( "-- Eintrag für Kalender --\nName: …\nTelefon: …\nDatum: Sa, 28.11.2026 von 20:00 - 21:15 Uhr\nPersonen: 18\nAusrüstungen: 18" ); ?>"></textarea>
+				</p>
+				<p class="description"><?php esc_html_e( 'Paste the "Eintrag für Kalender" block of a booking notification and fill the fields below. The customer e-mail is used inside the mails (Reply-To, drafts), but test mails are always delivered to the address below.', 'hsc-google-calendar' ); ?></p>
+				<?php submit_button( __( 'Fill form from block', 'hsc-google-calendar' ), 'secondary', 'submit', false ); ?>
+			</form>
+			<hr>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION_MAIL ); ?>">
 				<?php wp_nonce_field( self::ACTION_MAIL ); ?>
+				<table class="form-table" role="presentation">
+					<?php foreach ( $fields as $field ) : ?>
+						<tr>
+							<th scope="row"><label for="<?php echo esc_attr( $field['name'] ); ?>"><?php echo esc_html( $field['label'] ); ?></label></th>
+							<td>
+								<?php if ( 'textarea' === $field['type'] ) : ?>
+									<textarea class="large-text" rows="3" id="<?php echo esc_attr( $field['name'] ); ?>" name="<?php echo esc_attr( $field['name'] ); ?>"><?php echo esc_textarea( $field['value'] ); ?></textarea>
+								<?php else : ?>
+									<input type="<?php echo esc_attr( $field['type'] ); ?>" class="regular-text" id="<?php echo esc_attr( $field['name'] ); ?>" name="<?php echo esc_attr( $field['name'] ); ?>" value="<?php echo esc_attr( $field['value'] ); ?>"<?php echo $field['required'] ? ' required' : ''; ?>>
+								<?php endif; ?>
+								<?php if ( '' !== $field['hint'] ) : ?>
+									<p class="description"><?php echo esc_html( $field['hint'] ); ?></p>
+								<?php endif; ?>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				</table>
+				<p class="description"><?php esc_html_e( 'Nothing goes to the club inbox or to a real visitor: the selected mails are sent to the test address only and marked [TEST].', 'hsc-google-calendar' ); ?></p>
 				<p>
-					<label for="<?php echo esc_attr( self::FIELD_TEST_TO ); ?>"><?php esc_html_e( 'Send both booking e-mails with sample data to', 'hsc-google-calendar' ); ?></label><br>
-					<input type="email" class="regular-text" id="<?php echo esc_attr( self::FIELD_TEST_TO ); ?>" name="<?php echo esc_attr( self::FIELD_TEST_TO ); ?>" value="<?php echo esc_attr( $to ); ?>" required>
+					<button type="submit" name="<?php echo esc_attr( self::FIELD_TEST_SCOPE ); ?>" value="<?php echo esc_attr( Booking_Mailer::SCOPE_BOTH ); ?>" class="button button-secondary"><?php esc_html_e( 'Test both e-mails', 'hsc-google-calendar' ); ?></button>
+					<button type="submit" name="<?php echo esc_attr( self::FIELD_TEST_SCOPE ); ?>" value="<?php echo esc_attr( Booking_Mailer::SCOPE_CUSTOMER ); ?>" class="button button-secondary"><?php esc_html_e( 'Test customer receipt only', 'hsc-google-calendar' ); ?></button>
+					<button type="submit" name="<?php echo esc_attr( self::FIELD_TEST_SCOPE ); ?>" value="<?php echo esc_attr( Booking_Mailer::SCOPE_CLUB ); ?>" class="button button-secondary"><?php esc_html_e( 'Test club e-mail only', 'hsc-google-calendar' ); ?></button>
 				</p>
-				<p class="description"><?php esc_html_e( 'Nothing goes to the club inbox or to the sample visitor, both mails are sent to this address only and marked [TEST].', 'hsc-google-calendar' ); ?></p>
-				<?php submit_button( __( 'Send test e-mails', 'hsc-google-calendar' ), 'secondary', 'submit', false ); ?>
 			</form>
 			<?php if ( null !== $last ) : ?>
 				<h3>

@@ -1,7 +1,7 @@
 From: "{{name}}" <{{email}}>
 To: {{club_email}}
 Cc: {{cc}}
-Subject: Verleih Bestätigung - {{datum}}, {{uhrzeit}}
+Subject: Verleih Bestätigung - {{name}} - {{termin}}
 MIME-Version: 1.0
 Content-Type: text/html; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -36,7 +36,7 @@ Content-Transfer-Encoding: 8bit
 
 <!-- Wichtige Links -->
 <h3 style="margin:0 0 8px;font-size:18px;line-height:24px;font-weight:700;color:#181818;">Wichtige Links</h3>
-<p style="margin:0 0 24px;font-size:16px;line-height:24px;color:#181818;">Hier findest du alle <a href="https://sc-hohenems.at" style="color:#000000;text-decoration:underline;">Preise</a><br>Hier findest du <a href="https://sc-hohenems.at" style="color:#000000;text-decoration:underline;">häufig gestellte Fragen</a></p>
+<p style="margin:0 0 24px;font-size:16px;line-height:24px;color:#181818;">Hier findest du alle <a href="https://sc-hohenems.at/events/eisplatz-hohenems-mieten" style="color:#000000;text-decoration:underline;">Preise</a><br>Hier findest du <a href="https://sc-hohenems.at/events/eisplatz-hohenems-mieten" style="color:#000000;text-decoration:underline;">häufig gestellte Fragen</a></p>
 
 <!-- Checkliste -->
 <h3 style="margin:0 0 8px;font-size:18px;line-height:24px;font-weight:700;color:#181818;">Termin-Checkliste für euren Besuch im Stadion</h3>

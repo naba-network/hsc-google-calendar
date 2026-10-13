@@ -20,10 +20,14 @@ final class Booking_Mailer {
 	public const LABEL_NOTIFICATION = 'Notification to the club';
 	public const LABEL_CONFIRMATION = 'Confirmation to the visitor';
 
+	public const SCOPE_BOTH     = 'both';
+	public const SCOPE_CLUB     = 'club';
+	public const SCOPE_CUSTOMER = 'customer';
+
 	private const LINE_BREAK = "\n";
 
-	private const DRAFT_FILE_NAME = 'verleih-bestaetigung.eml';
-	private const DRAFT_TEMPLATE  = 'verleih-buchung.emltpl';
+	public const DRAFT_CONFIRMATION = 'verleih-bestaetigung.eml';
+	public const DRAFT_DECLINE      = 'verleih-absage.eml';
 
 	/**
 	 * Creates the mailer.
@@ -32,7 +36,7 @@ final class Booking_Mailer {
 	 * @param string               $from_email Sender address.
 	 * @param string               $from_name  Sender name.
 	 * @param string               $notify_to  Address that receives the notification.
-	 * @param string               $draft_template Path to the .emltpl template of the confirmation draft, empty for no attachment.
+	 * @param array<string,string> $draft_templates Paths of the .emltpl templates by attachment file name, empty for no attachments.
 	 * @param string               $cc        Copy recipient of the confirmation draft and the mailto link, empty for none.
 	 * @param array<string,string> $phones Phone numbers for the draft, by placeholder name. A "<name>_link" placeholder holds the dialable form.
 	 */
@@ -41,7 +45,7 @@ final class Booking_Mailer {
 		private readonly string $from_email,
 		private readonly string $from_name,
 		private readonly string $notify_to,
-		private readonly string $draft_template = '',
+		private readonly array $draft_templates = array(),
 		private readonly string $cc = '',
 		private readonly array $phones = array()
 	) {}
@@ -58,14 +62,14 @@ final class Booking_Mailer {
 	public static function with_wordpress_mail( string $from_email, string $from_name, string $notify_to, string $cc = '', array $phones = array() ): self {
 		$send = static function ( Mail_Message $mail ) use ( $from_email ): ?string {
 			$error = '';
-			// Adds the plain text alternative and the attachment. The envelope sender is only set for PHP mail()/sendmail: SMTP plugins such as
+			// Adds the plain text alternative and the attachments. The envelope sender is only set for PHP mail()/sendmail: SMTP plugins such as
 			// WP Mail SMTP choose it themselves, and an address the SMTP account does not own would be rejected.
 			$set_sender = static function ( $phpmailer ) use ( $from_email, $mail ): void {
 				if ( '' !== $mail->alt_body ) {
 					$phpmailer->AltBody = $mail->alt_body; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- PHPMailer property.
 				}
-				if ( '' !== $mail->attachment ) {
-					$phpmailer->addStringAttachment( $mail->attachment, $mail->attachment_name, 'base64', 'message/rfc822' );
+				foreach ( $mail->attachments as $file_name => $content ) {
+					$phpmailer->addStringAttachment( $content, (string) $file_name, 'base64', 'message/rfc822' );
 				}
 				if ( in_array( $phpmailer->Mailer, array( 'mail', 'sendmail' ), true ) ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- PHPMailer property.
 					$phpmailer->Sender = $from_email; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- PHPMailer property.
@@ -87,7 +91,18 @@ final class Booking_Mailer {
 			return '' !== $error ? $error : 'wp_mail() returned false.';
 		};
 
-		return new self( $send, $from_email, $from_name, $notify_to, dirname( __DIR__ ) . '/templates/' . self::DRAFT_TEMPLATE, $cc, $phones );
+		return new self(
+			$send,
+			$from_email,
+			$from_name,
+			$notify_to,
+			array(
+				self::DRAFT_CONFIRMATION => dirname( __DIR__ ) . '/templates/verleih-buchung.emltpl',
+				self::DRAFT_DECLINE      => dirname( __DIR__ ) . '/templates/verleih-absage.emltpl',
+			),
+			$cc,
+			$phones
+		);
 	}
 
 	/**
@@ -128,8 +143,7 @@ final class Booking_Mailer {
 				$this->notification_html( $request, $event ),
 				$this->headers( self::header_value( $request->name ) . ' <' . $request->email . '>' ),
 				$this->notification_body( $request, $event ),
-				$this->confirmation_draft( $request, $event ),
-				self::DRAFT_FILE_NAME
+				$this->drafts( $request, $event )
 			),
 			'confirmation' => new Mail_Message(
 				$request->email,
@@ -142,24 +156,33 @@ final class Booking_Mailer {
 	}
 
 	/**
-	 * Sends both mails to one test address only. The address also replaces the visitor address, so
-	 * Reply-To and the pasted details point to a real mailbox instead of a sample domain that mail servers may reject.
+	 * Sends the selected mails to one test address only, whatever the visitor address is. The visitor address only appears
+	 * inside the content (Reply-To, draft, mailto link). When the sample has none, the test address stands in for it, so
+	 * Reply-To and the drafts point to a real mailbox instead of a sample domain that mail servers may reject.
 	 *
-	 * @param Booking_Request $sample  Sample request, its e-mail address is replaced by $to.
+	 * @param Booking_Request $sample  Sample request, its e-mail address may be empty.
 	 * @param Event           $event   Sample event.
 	 * @param string          $to      Test recipient.
+	 * @param string          $scope   Which mails to send: SCOPE_BOTH, SCOPE_CLUB or SCOPE_CUSTOMER. Anything else sends both.
 	 *
 	 * @return list<array{label: string, mail: Mail_Message, error: string|null}> One entry per mail, in sending order.
 	 */
-	public function send_test( Booking_Request $sample, Event $event, string $to ): array {
-		$request  = new Booking_Request( $sample->event_id, $sample->name, $to, $sample->phone, $sample->participants, $sample->rental, $sample->message, '' );
+	public function send_test( Booking_Request $sample, Event $event, string $to, string $scope = self::SCOPE_BOTH ): array {
+		$request  = new Booking_Request( $sample->event_id, $sample->name, '' !== $sample->email ? $sample->email : $to, $sample->phone, $sample->participants, $sample->rental, $sample->message, '' );
 		$messages = $this->build( $request, $event );
 		$results  = array();
 
-		foreach ( array(
+		$selected = array(
 			self::LABEL_NOTIFICATION => $messages['notification'],
 			self::LABEL_CONFIRMATION => $messages['confirmation'],
-		) as $label => $message ) {
+		);
+		if ( self::SCOPE_CLUB === $scope ) {
+			unset( $selected[ self::LABEL_CONFIRMATION ] );
+		} elseif ( self::SCOPE_CUSTOMER === $scope ) {
+			unset( $selected[ self::LABEL_NOTIFICATION ] );
+		}
+
+		foreach ( $selected as $label => $message ) {
 			$mail      = $message->redirected( $to, '[TEST] ' );
 			$results[] = array(
 				'label' => $label,
@@ -183,16 +206,37 @@ final class Booking_Mailer {
 	}
 
 	/**
-	 * Confirmation to the visitor as an unsent .eml draft, filled from the template. The club opens it in its own
-	 * mail client and sends it from there. Empty when no template is configured or it cannot be read.
-	 *
-	 * Placeholders like {{name}} are replaced in the headers (no line breaks, no angle brackets) and escaped in the HTML body.
+	 * The .eml drafts for the club (confirmation and decline) by file name. Templates that are missing or unreadable are left out.
 	 *
 	 * @param Booking_Request $request Request.
 	 * @param Event           $event   Event.
+	 *
+	 * @return array<string,string>
 	 */
-	private function confirmation_draft( Booking_Request $request, Event $event ): string {
-		$template = '' !== $this->draft_template && is_readable( $this->draft_template ) ? file_get_contents( $this->draft_template ) : false; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local template file.
+	private function drafts( Booking_Request $request, Event $event ): array {
+		$drafts = array();
+		foreach ( $this->draft_templates as $file_name => $path ) {
+			$draft = $this->draft( $path, $request, $event );
+			if ( '' !== $draft ) {
+				$drafts[ $file_name ] = $draft;
+			}
+		}
+
+		return $drafts;
+	}
+
+	/**
+	 * An unsent .eml draft for the visitor, filled from a template. The club opens it in its own
+	 * mail client and sends it from there. Empty when the template cannot be read.
+	 *
+	 * Placeholders like {{name}} are replaced in the headers (no line breaks, no angle brackets) and escaped in the HTML body.
+	 *
+	 * @param string          $path    Path of the .emltpl template.
+	 * @param Booking_Request $request Request.
+	 * @param Event           $event   Event.
+	 */
+	private function draft( string $path, Booking_Request $request, Event $event ): string {
+		$template = is_readable( $path ) ? file_get_contents( $path ) : false; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local template file.
 		if ( false === $template ) {
 			return '';
 		}
@@ -207,6 +251,7 @@ final class Booking_Mailer {
 			'email'           => $request->email,
 			'telefon'         => $request->phone,
 			'datum'           => $event->date_label(),
+			'termin'          => self::subject_slot( $event ),
 			'uhrzeit'         => $event->time_label(),
 			'teilnehmer'      => (string) $request->participants,
 			'leihausruestung' => (string) $request->rental,
@@ -231,6 +276,35 @@ final class Booking_Mailer {
 	}
 
 	/**
+	 * Phone number as tel: link (dialable digits only), plain escaped text when it has no digits.
+	 *
+	 * @param string $phone Phone number as typed by the visitor.
+	 */
+	private static function phone_link( string $phone ): string {
+		$dial = (string) preg_replace( '/[^\d+]/', '', $phone );
+		if ( '' === $dial ) {
+			return Mail_Layout::escape( $phone );
+		}
+
+		return '<a href="tel:' . Mail_Layout::escape( $dial ) . '" style="color:#000000;text-decoration:underline;">' . Mail_Layout::escape( $phone ) . '</a>';
+	}
+
+	/**
+	 * Date and time for subjects, e.g. "SA, 17.10.2026 von 10:00 – 11:30 Uhr".
+	 *
+	 * @param Event $event Event.
+	 */
+	private static function subject_slot( Event $event ): string {
+		$slot = (string) preg_replace_callback(
+			'/^[A-Z][a-z],/',
+			static fn ( array $found ): string => strtoupper( $found[0] ),
+			$event->slot_label()
+		);
+
+		return str_replace( ' - ', ' – ', $slot );
+	}
+
+	/**
 	 * Link with the mailto scheme that opens a new mail to the visitor with subject and a short plain text confirmation.
 	 * Works in every mail client, unlike the .eml draft, but cannot carry the HTML layout.
 	 *
@@ -238,7 +312,7 @@ final class Booking_Mailer {
 	 * @param Event           $event   Event.
 	 */
 	private function confirmation_mailto( Booking_Request $request, Event $event ): string {
-		$subject = 'Verleih Bestätigung - ' . $event->date_label() . ', ' . $event->time_label();
+		$subject = 'Verleih Bestätigung - ' . self::single_line( $request->name ) . ' - ' . self::subject_slot( $event );
 		$body    = str_replace( self::LINE_BREAK, "\r\n", $this->confirmation_body( $request, $event ) );
 
 		$cc = '' !== self::single_line( $this->cc ) ? '&cc=' . rawurlencode( self::single_line( $this->cc ) ) : '';
@@ -295,8 +369,6 @@ final class Booking_Mailer {
 				'',
 				'-- E-Mail: --',
 				'Datum: ',
-				$request->name . ' - ' . $slot,
-				'Datum: ',
 				$slot,
 				'Anzahl: ',
 				$request->participants . ' Personen / ' . $request->rental . ' Ausrüstungen',
@@ -319,19 +391,18 @@ final class Booking_Mailer {
 		$slot  = $event->slot_label();
 		$lines = '';
 		foreach ( $this->calendar_lines( $request, $slot ) as $line ) {
-			$lines .= '<div>' . Mail_Layout::escape( $line ) . '</div>';
+			$lines .= '<div>' . ( 'Telefon: ' . $request->phone === $line ? 'Telefon: ' . self::phone_link( $request->phone ) : Mail_Layout::escape( $line ) ) . '</div>';
 		}
 
 		$details = array(
-			array( 'Datum', $request->name . ' - ' . $slot ),
-			array( 'Datum', $slot ),
-			array( 'Anzahl', $request->participants . ' Personen / ' . $request->rental . ' Ausrüstungen' ),
-			array( 'Ansprechperson', $request->name . ' - ' . $request->phone ),
+			array( 'Datum', Mail_Layout::escape( $slot ) ),
+			array( 'Anzahl', Mail_Layout::escape( $request->participants . ' Personen / ' . $request->rental . ' Ausrüstungen' ) ),
+			array( 'Ansprechperson', Mail_Layout::escape( $request->name ) . ' - ' . self::phone_link( $request->phone ) ),
 		);
 		$rows    = '';
 		foreach ( $details as list( $label, $value ) ) {
 			$rows .= '<tr><td style="padding:8px 12px 8px 0;vertical-align:top;white-space:nowrap;font-weight:600;color:#6B7280;">' . Mail_Layout::escape( $label ) . '</td>'
-				. '<td style="padding:8px 0;vertical-align:top;">' . Mail_Layout::escape( $value ) . '</td></tr>';
+				. '<td style="padding:8px 0;vertical-align:top;">' . $value . '</td></tr>';
 		}
 
 		$content = '<h1 style="margin:0 0 16px;font-size:24px;line-height:28px;font-weight:700;color:#181818;">Verleih Anfrage</h1>'

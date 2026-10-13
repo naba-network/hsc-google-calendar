@@ -1,0 +1,46 @@
+From: "{{name}}" <{{email}}>
+To: {{club_email}}
+Cc: {{cc}}
+Subject: Verleih Absage - {{name}} - {{termin}}
+MIME-Version: 1.0
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Verleih Absage</title></head>
+<body style="margin:0;padding:0;background-color:#F4F4F4;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#181818;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#F4F4F4" style="border-collapse:collapse;width:100%;background-color:#F4F4F4;"><tr>
+<td align="center" style="font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#181818;padding:32px 16px 48px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="border-collapse:separate;width:100%;max-width:640px;background-color:#FFFFFF;border-radius:12px;border:1px solid #E5E7EB;">
+<tr><td style="font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:24px 24px 0;"><h2 style="margin:0;font-size:20px;line-height:24px;font-weight:700;color:#181818;">SC Samina Hohenems - Verleih</h2></td></tr>
+<tr><td style="font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#181818;padding:24px;text-align:left;">
+
+<h1 style="margin:0 0 16px;font-size:24px;line-height:28px;font-weight:700;color:#181818;">Dein Termin ist leider nicht mehr verfügbar</h1>
+
+<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:#181818;">Hallo {{name}},</p>
+
+<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:#181818;">vielen Dank für deine Buchungsanfrage. Leider müssen wir dir mitteilen, dass der gewünschte Termin <strong>nicht mehr verfügbar</strong> ist und wir ihn nicht bestätigen können. Das tut uns wirklich leid!</p>
+
+<h3 style="margin:0 0 8px;font-size:18px;line-height:24px;font-weight:700;color:#181818;">Deine Anfrage</h3>
+<div style="margin:0 0 24px;padding:16px;background-color:#F4F4F4;border-radius:8px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+<tr><td style="padding:8px 12px 8px 0;vertical-align:top;white-space:nowrap;font-weight:600;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;color:#6B7280;">Datum</td><td style="padding:8px 0;vertical-align:top;">{{termin}}</td></tr>
+<tr><td style="padding:8px 12px 8px 0;vertical-align:top;white-space:nowrap;font-weight:600;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;color:#6B7280;">Teilnehmerzahl</td><td style="padding:8px 0;vertical-align:top;">{{teilnehmer}} Personen</td></tr>
+<tr><td style="padding:8px 12px 8px 0;vertical-align:top;white-space:nowrap;font-weight:600;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;color:#6B7280;">Ausrüstungen</td><td style="padding:8px 0;vertical-align:top;">{{leihausruestung}} Ausrüstungen</td></tr>
+</table></div>
+
+<h3 style="margin:0 0 8px;font-size:18px;line-height:24px;font-weight:700;color:#181818;">So findest du einen neuen Termin</h3>
+<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:#181818;">Schau einfach in unserer Termin-Übersicht nach – dort siehst du alle freien Zeiten und kannst direkt eine neue Anfrage senden:</p>
+<p style="margin:0 0 24px;">
+<a href="https://sc-hohenems.at/events/eisplatz-hohenems-mieten" style="display:inline-block;padding:12px 20px;background-color:#1A1A1A;color:#FFFFFF;text-decoration:none;font-weight:600;border-radius:8px;">Freie Termine ansehen</a>
+</p>
+<p style="margin:0 0 24px;font-size:16px;line-height:24px;color:#181818;">Weitere Infos findest du hier:<br>
+→ <a href="https://sc-hohenems.at/events/eisplatz-hohenems-mieten" style="color:#000000;text-decoration:underline;">Preise</a><br>
+→ <a href="https://sc-hohenems.at/events/eisplatz-hohenems-mieten" style="color:#000000;text-decoration:underline;">Häufig gestellte Fragen</a></p>
+
+<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:#181818;">Wir hoffen, dich bald bei uns im Stadion begrüßen zu dürfen! 😊</p>
+<p style="margin:0;font-size:16px;line-height:24px;color:#181818;">Sportliche Grüße<br>SC Samina Hohenems</p>
+
+</td></tr></table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:640px;"><tr>
+<td style="font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:24px;font-size:13px;line-height:20px;color:#6B7280;"><a href="https://sc-hohenems.at" style="color:#000000;text-decoration:underline;">sc-hohenems.at</a></td></tr></table>
+</td></tr></table></body></html>

@@ -14,6 +14,7 @@ require_once dirname(__DIR__) . '/includes/class-booking.php';
 require_once dirname(__DIR__) . '/includes/class-booking-summary.php';
 require_once dirname(__DIR__) . '/includes/class-booking-request.php';
 require_once dirname(__DIR__) . '/includes/class-date-range.php';
+require_once dirname(__DIR__) . '/includes/class-calendar-block.php';
 require_once dirname(__DIR__) . '/includes/class-captcha.php';
 require_once dirname(__DIR__) . '/includes/class-mail-message.php';
 require_once dirname(__DIR__) . '/includes/class-mail-layout.php';
