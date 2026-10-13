@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 Versions are generated automatically on push to `production`.
 
+## [0.4.0] - 2026-10-13
+
+### Added
+
+- decline draft, customizable test mails and mail tweaks
+
 ## [0.3.0] - 2026-10-13
 
 ### Added
