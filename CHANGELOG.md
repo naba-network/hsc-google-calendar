@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 Versions are generated automatically on push to `production`.
 
+## [0.3.0] - 2026-10-13
+
+### Added
+
+- add mailto link, CC and phone settings for the confirmation draft
+
 ## [0.2.0] - 2026-10-13
 
 ### Added
