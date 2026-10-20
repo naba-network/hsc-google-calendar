@@ -22,6 +22,7 @@ final class Booking_Controller {
 	public const REST_NAMESPACE = 'hsc-gcal/v1';
 	public const ROUTE_CAPTCHA  = '/captcha';
 	public const ROUTE_BOOKING  = '/booking';
+	public const ROUTE_EVENTS   = '/events';
 
 	private const STATUS_OK          = 200;
 	private const STATUS_INVALID     = 422;
@@ -38,11 +39,13 @@ final class Booking_Controller {
 	 * @param Event_Source   $events  Calendar events.
 	 * @param Captcha        $captcha Captcha.
 	 * @param Booking_Mailer $mailer  Mailer.
+	 * @param Shortcodes     $lists   Renders the event list for the events route.
 	 */
 	public function __construct(
 		private readonly Event_Source $events,
 		private readonly Captcha $captcha,
-		private readonly Booking_Mailer $mailer
+		private readonly Booking_Mailer $mailer,
+		private readonly Shortcodes $lists
 	) {}
 
 	/**
@@ -62,6 +65,15 @@ final class Booking_Controller {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'handle_captcha' ),
+				'permission_callback' => '__return_true',
+			)
+		);
+		register_rest_route(
+			self::REST_NAMESPACE,
+			self::ROUTE_EVENTS,
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'handle_events' ),
 				'permission_callback' => '__return_true',
 			)
 		);
@@ -102,6 +114,17 @@ final class Booking_Controller {
 	 */
 	public function handle_captcha(): WP_REST_Response {
 		$response = new WP_REST_Response( $this->captcha->challenge( time() ), self::STATUS_OK );
+		$response->header( 'Cache-Control', 'no-store' );
+
+		return $response;
+	}
+
+	/**
+	 * Rendered list of bookable events. Loaded by the browser after the page, so a slow calendar never blocks it.
+	 */
+	public function handle_events(): WP_REST_Response {
+		$list     = $this->lists->render_events();
+		$response = new WP_REST_Response( array( 'html' => $list['html'] ), $list['ok'] ? self::STATUS_OK : self::STATUS_UNAVAILABLE );
 		$response->header( 'Cache-Control', 'no-store' );
 
 		return $response;

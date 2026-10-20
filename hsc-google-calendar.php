@@ -81,13 +81,16 @@ $hsc_gcal_mailer = \Hsc\GoogleCalendar\Booking_Mailer::with_wordpress_mail(
 	$hsc_gcal_settings,
 	\Hsc\GoogleCalendar\Connection_Tester::with_wordpress_http(),
 	$hsc_gcal_events,
-	$hsc_gcal_mailer
+	$hsc_gcal_mailer,
+	$hsc_gcal_shortcodes
 ) )->register();
 
-( new \Hsc\GoogleCalendar\Shortcodes( $hsc_gcal_events, plugin_dir_url( HSC_GCAL_FILE ), HSC_GCAL_VERSION ) )->register();
+$hsc_gcal_shortcodes = new \Hsc\GoogleCalendar\Shortcodes( $hsc_gcal_events, plugin_dir_url( HSC_GCAL_FILE ), HSC_GCAL_VERSION );
+$hsc_gcal_shortcodes->register();
 
 ( new \Hsc\GoogleCalendar\Booking_Controller(
 	$hsc_gcal_events,
 	new \Hsc\GoogleCalendar\Captcha( static fn(): string => wp_salt( 'auth' ) ),
-	$hsc_gcal_mailer
+	$hsc_gcal_mailer,
+	$hsc_gcal_shortcodes
 ) )->register();

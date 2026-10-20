@@ -44,18 +44,41 @@ final class Shortcodes {
 	}
 
 	/**
-	 * Renders the bookable events grouped by month.
+	 * Renders the shell of the bookable event list. The events themselves are loaded by booking.js from the
+	 * events REST route, so a slow Google Calendar never delays the page.
 	 */
 	public function render_list(): string {
 		$this->enqueue_style();
+		wp_enqueue_script( self::HANDLE, $this->plugin_url . 'assets/booking.js', array(), $this->version, array( 'in_footer' => true ) );
 
+		return $this->render_template(
+			'booking-list',
+			array(
+				'config' => array(
+					'bookingUrl'      => rest_url( Booking_Controller::REST_NAMESPACE . Booking_Controller::ROUTE_BOOKING ),
+					'captchaUrl'      => rest_url( Booking_Controller::REST_NAMESPACE . Booking_Controller::ROUTE_CAPTCHA ),
+					'eventsUrl'       => rest_url( Booking_Controller::REST_NAMESPACE . Booking_Controller::ROUTE_EVENTS ),
+					'messages'        => Booking_Controller::messages(),
+					'maxParticipants' => Booking_Request::MAX_PARTICIPANTS,
+				),
+			)
+		);
+	}
+
+	/**
+	 * Renders the bookable events grouped by month (or a notice when the calendar cannot be read).
+	 *
+	 * @return array{ok: bool, html: string}
+	 */
+	public function render_events(): array {
 		try {
 			$events = $this->events->free_events( time() );
 		} catch ( RuntimeException | \InvalidArgumentException $e ) {
-			return $this->render_template( 'notice', array( 'message' => $this->visitor_error( $e ) ) );
+			return array(
+				'ok'   => false,
+				'html' => $this->render_template( 'notice', array( 'message' => $this->visitor_error( $e ) ) ),
+			);
 		}
-
-		wp_enqueue_script( self::HANDLE, $this->plugin_url . 'assets/booking.js', array(), $this->version, array( 'in_footer' => true ) );
 
 		$months = array();
 		foreach ( $events as $event ) {
@@ -66,18 +89,15 @@ final class Shortcodes {
 		}
 		ksort( $months );
 
-		return $this->render_template(
-			'booking-list',
-			array(
-				'months'   => $months,
-				'config'   => array(
-					'bookingUrl'      => rest_url( Booking_Controller::REST_NAMESPACE . Booking_Controller::ROUTE_BOOKING ),
-					'captchaUrl'      => rest_url( Booking_Controller::REST_NAMESPACE . Booking_Controller::ROUTE_CAPTCHA ),
-					'messages'        => Booking_Controller::messages(),
-					'maxParticipants' => Booking_Request::MAX_PARTICIPANTS,
-				),
-				'labeller' => fn( string $key ): string => $this->month_label( $key ),
-			)
+		return array(
+			'ok'   => true,
+			'html' => $this->render_template(
+				'booking-events',
+				array(
+					'months'   => $months,
+					'labeller' => fn( string $key ): string => $this->month_label( $key ),
+				)
+			),
 		);
 	}
 

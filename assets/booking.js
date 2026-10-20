@@ -10,7 +10,7 @@
 	const GENERAL_FIELD = '';
 
 	/**
-	 * @typedef {{bookingUrl: string, captchaUrl: string, maxParticipants: number, messages: Object<string, string>}} Config
+	 * @typedef {{bookingUrl: string, captchaUrl: string, eventsUrl: string, maxParticipants: number, messages: Object<string, string>}} Config
 	 */
 
 	/**
@@ -21,6 +21,7 @@
 		const config = JSON.parse( root.dataset.config || '{}' );
 		const formTemplate = root.querySelector( '[data-hsc-form]' );
 		const doneTemplate = root.querySelector( '[data-hsc-done]' );
+		loadEvents();
 		if ( ! formTemplate || ! doneTemplate || typeof HTMLDialogElement === 'undefined' ) {
 			return;
 		}
@@ -61,6 +62,28 @@
 			dialog.showModal();
 			dialog.querySelector( '[data-hsc-title]' ).focus();
 			loadCaptcha( form );
+		}
+
+		/**
+		 * Loads the event list after the page, so a slow calendar never blocks rendering.
+		 * The server answers with ready-made HTML, also for errors.
+		 */
+		async function loadEvents() {
+			const container = root.querySelector( '[data-hsc-events]' );
+			if ( ! container ) {
+				return;
+			}
+			try {
+				const response = await fetch( config.eventsUrl, { cache: 'no-store' } );
+				const data = await response.json();
+				container.innerHTML = data.html;
+			} catch ( error ) {
+				const notice = document.createElement( 'p' );
+				notice.className = 'hsc-booking__notice';
+				notice.textContent = config.messages.calendar_unavailable;
+				container.replaceChildren( notice );
+			}
+			container.removeAttribute( 'aria-busy' );
 		}
 
 		/**
