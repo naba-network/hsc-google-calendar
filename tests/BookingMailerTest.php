@@ -61,6 +61,35 @@ final class BookingMailerTest extends TestCase
         self::assertSame([], $messages['confirmation']->attachments);
     }
 
+    public function testShippedDraftsAreUnsentAndSevenBitClean(): void
+    {
+        $messages = (new Booking_Mailer(
+            static fn (): ?string => null,
+            'verleih@example.test',
+            'SC Test - Verleih',
+            'club@example.test',
+            [
+                Booking_Mailer::DRAFT_CONFIRMATION => dirname(__DIR__) . '/templates/verleih-buchung.emltpl',
+                Booking_Mailer::DRAFT_DECLINE => dirname(__DIR__) . '/templates/verleih-absage.emltpl',
+            ]
+        ))->build(Booking_Request::from_array([
+            'name' => 'Jörg Müller',
+            'email' => 'joerg@example.com',
+            'phone' => '+43 660 0000001',
+            'participants' => '4',
+            'rental' => '2',
+        ]), $this->event());
+
+        foreach ($messages['notification']->attachments as $draft) {
+            // Outlook opens an X-Unsent draft ready to send; 7-bit clean content survives the non-base64 attachment encoding.
+            self::assertStringStartsWith("X-Unsent: 1\r\n", $draft);
+            self::assertStringContainsString("\r\nFrom: =?UTF-8?B?" . base64_encode('Jörg Müller') . '?= <joerg@example.com>', $draft);
+            self::assertStringContainsString("\r\nContent-Transfer-Encoding: quoted-printable\r\n", $draft);
+            self::assertSame(1, preg_match('/^[\x00-\x7F]*$/', $draft));
+            self::assertSame(0, preg_match('/[^\r\n]{999}/', $draft));
+        }
+    }
+
     public function testDraftFillsPhoneNumbers(): void
     {
         $template = tempnam(sys_get_temp_dir(), 'emltpl');

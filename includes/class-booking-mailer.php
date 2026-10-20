@@ -26,6 +26,8 @@ final class Booking_Mailer {
 
 	private const LINE_BREAK = "\n";
 
+	private const HEADER_QUOTED_PRINTABLE = 'Content-Transfer-Encoding: quoted-printable';
+
 	public const DRAFT_CONFIRMATION = 'verleih-bestaetigung.eml';
 	public const DRAFT_DECLINE      = 'verleih-absage.eml';
 
@@ -69,8 +71,9 @@ final class Booking_Mailer {
 					$phpmailer->AltBody = $mail->alt_body; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- PHPMailer property.
 				}
 				foreach ( $mail->attachments as $file_name => $content ) {
-					// Not message/rfc822: RFC 2046 forbids base64 for it, and Exchange/Outlook/OWA then parse it as an embedded message and show 0 KB.
-					$phpmailer->addStringAttachment( $content, (string) $file_name, 'base64', 'application/octet-stream' );
+					// message/rfc822 makes Outlook open the draft itself instead of handing the file to the OS default (Apple Mail for .eml).
+					// Never base64 here: RFC 2046 forbids it for message/rfc822, and Exchange/Outlook/OWA then show 0 KB. The drafts are 7-bit clean, see draft().
+					$phpmailer->addStringAttachment( $content, (string) $file_name, '7bit', 'message/rfc822' );
 				}
 				if ( in_array( $phpmailer->Mailer, array( 'mail', 'sendmail' ), true ) ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- PHPMailer property.
 					$phpmailer->Sender = $from_email; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- PHPMailer property.
@@ -270,7 +273,12 @@ final class Booking_Mailer {
 			if ( 'Cc: ' === $line ) {
 				continue;
 			}
-			$headers[] = str_starts_with( $line, 'Subject: ' ) ? 'Subject: ' . self::encode_header( substr( $line, 9 ) ) : $line;
+			$headers[] = self::encode_header_line( $line );
+		}
+
+		// Quoted-printable keeps the draft pure ASCII with short lines, so it survives the 7-bit attachment encoding unchanged.
+		if ( in_array( self::HEADER_QUOTED_PRINTABLE, $headers, true ) ) {
+			$body = quoted_printable_encode( $body );
 		}
 
 		return str_replace( "\n", "\r\n", str_replace( "\r\n", "\n", implode( "\n", $headers ) . "\n\n" . $body ) );
@@ -334,6 +342,24 @@ final class Booking_Mailer {
 		}
 
 		return strtr( $text, $map );
+	}
+
+	/**
+	 * Makes one draft header line pure ASCII: the subject and the sender name (umlauts in the visitor's name) become RFC 2047 words.
+	 *
+	 * @param string $line Header line, "Name: value".
+	 */
+	private static function encode_header_line( string $line ): string {
+		if ( str_starts_with( $line, 'Subject: ' ) ) {
+			return 'Subject: ' . self::encode_header( substr( $line, 9 ) );
+		}
+
+		// An encoded word must not sit inside a quoted string, so the quotes only stay around plain ASCII names.
+		return (string) preg_replace_callback(
+			'/^From: "([^"]*)" </',
+			static fn ( array $found ): string => self::encode_header( $found[1] ) === $found[1] ? $found[0] : 'From: ' . self::encode_header( $found[1] ) . ' <',
+			$line
+		);
 	}
 
 	/**

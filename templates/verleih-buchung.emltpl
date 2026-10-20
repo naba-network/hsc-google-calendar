@@ -1,10 +1,11 @@
+X-Unsent: 1
 From: "{{name}}" <{{email}}>
 To: {{club_email}}
 Cc: {{cc}}
 Subject: Verleih Bestätigung - {{name}} - {{termin}}
 MIME-Version: 1.0
 Content-Type: text/html; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+Content-Transfer-Encoding: quoted-printable
 
 <!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Verleih Bestätigung</title></head>
 <body style="margin:0;padding:0;background-color:#F4F4F4;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#181818;">
