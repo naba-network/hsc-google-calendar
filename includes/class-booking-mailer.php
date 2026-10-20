@@ -69,7 +69,8 @@ final class Booking_Mailer {
 					$phpmailer->AltBody = $mail->alt_body; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- PHPMailer property.
 				}
 				foreach ( $mail->attachments as $file_name => $content ) {
-					$phpmailer->addStringAttachment( $content, (string) $file_name, 'base64', 'message/rfc822' );
+					// Not message/rfc822: RFC 2046 forbids base64 for it, and Exchange/Outlook/OWA then parse it as an embedded message and show 0 KB.
+					$phpmailer->addStringAttachment( $content, (string) $file_name, 'base64', 'application/octet-stream' );
 				}
 				if ( in_array( $phpmailer->Mailer, array( 'mail', 'sendmail' ), true ) ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- PHPMailer property.
 					$phpmailer->Sender = $from_email; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- PHPMailer property.
